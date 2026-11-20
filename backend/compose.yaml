@@ -1,0 +1,190 @@
+services:
+  service-registry:
+    build:
+      context: .
+      args:
+        MODULE: service-registry
+    ports:
+      - "8762:8761"
+
+  servicenow-integration:
+    build:
+      context: .
+      args:
+        MODULE: servicenow-integration
+    environment:
+      EUREKA_URL: http://service-registry:8761/eureka/
+      SERVICENOW_BASE_URL: ${SERVICENOW_BASE_URL:-}
+      SERVICENOW_CLIENT_ID: ${SERVICENOW_CLIENT_ID:-}
+      SERVICENOW_CLIENT_SECRET: ${SERVICENOW_CLIENT_SECRET:-}
+      SERVICENOW_TOKEN_URI: ${SERVICENOW_TOKEN_URI:-}
+    depends_on:
+      - service-registry
+
+  auth-service:
+    build:
+      context: .
+      args:
+        MODULE: auth-service
+    environment:
+      EUREKA_URL: http://service-registry:8761/eureka/
+      MYSQL_URL: jdbc:mysql://mysql:3306/northstar_auth?serverTimezone=UTC
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in backend/.env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in backend/.env}
+      JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET:?Set JWT_SIGNING_SECRET in backend/.env}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI:-northstar-auth}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-northstar-portal}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@northstar.local}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?Set BOOTSTRAP_ADMIN_PASSWORD in backend/.env}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-Northstar Administrator}
+      PORTAL_IMPERSONATION_ENABLED: ${PORTAL_IMPERSONATION_ENABLED:-false}
+    depends_on:
+      service-registry:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  catalog-service:
+    build:
+      context: .
+      args:
+        MODULE: catalog-service
+    environment:
+      EUREKA_URL: http://service-registry:8761/eureka/
+      REDIS_HOST: redis
+    depends_on:
+      - service-registry
+      - servicenow-integration
+      - redis
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: northstar_request_service
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in backend/.env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in backend/.env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in backend/.env}
+    volumes:
+      - request-mysql-data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  incident-schema-init:
+    image: mysql:8.4
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      mysql -hmysql -uroot -p"$$MYSQL_ROOT_PASSWORD" -e
+      "CREATE DATABASE IF NOT EXISTS northstar_incident_service CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+      GRANT ALL PRIVILEGES ON northstar_incident_service.* TO '$$MYSQL_USER'@'%';
+      FLUSH PRIVILEGES;"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in backend/.env}
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in backend/.env}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER in backend/.env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in backend/.env}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  request-service:
+    build:
+      context: .
+      args:
+        MODULE: request-service
+    environment:
+      EUREKA_URL: http://service-registry:8761/eureka/
+      MYSQL_URL: jdbc:mysql://mysql:3306/northstar_request_service?serverTimezone=UTC
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in backend/.env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in backend/.env}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER in backend/.env}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in backend/.env}
+      JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET:?Set JWT_SIGNING_SECRET in backend/.env}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI:-northstar-auth}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-northstar-portal}
+    depends_on:
+      service-registry:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  incident-service:
+    build:
+      context: .
+      args:
+        MODULE: incident-service
+    environment:
+      EUREKA_URL: http://service-registry:8761/eureka/
+      MYSQL_URL: jdbc:mysql://mysql:3306/northstar_incident_service?serverTimezone=UTC
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in backend/.env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in backend/.env}
+      JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET:?Set JWT_SIGNING_SECRET in backend/.env}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI:-northstar-auth}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-northstar-portal}
+    depends_on:
+      service-registry:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+      incident-schema-init:
+        condition: service_completed_successfully
+
+  api-gateway:
+    build:
+      context: .
+      args:
+        MODULE: api-gateway
+    environment:
+      PORT: 7777
+      SPRING_PROFILES_ACTIVE: local
+      EUREKA_URL: http://service-registry:8761/eureka/
+      JWT_SIGNING_SECRET: ${JWT_SIGNING_SECRET:?Set JWT_SIGNING_SECRET in backend/.env}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI:-northstar-auth}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-northstar-portal}
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3001
+    ports:
+      - "7777:7777"
+    depends_on:
+      - service-registry
+      - auth-service
+      - incident-service
+      - servicenow-integration
+      - catalog-service
+
+  frontend:
+    build:
+      context: ../frontend
+    ports:
+      - "3001:80"
+    depends_on:
+      - api-gateway
+
+volumes:
+  request-mysql-data:
+  rabbitmq-data:

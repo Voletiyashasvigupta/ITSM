@@ -1,0 +1,37 @@
+server:
+  port: ${PORT:8084}
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/northstar_auth?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${MYSQL_USER:northstar}
+    password: ${MYSQL_PASSWORD:local-only-change-me}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  jackson:
+    default-property-inclusion: non_null
+security:
+  jwt:
+    secret: ${JWT_SIGNING_SECRET:}
+    issuer: ${JWT_ISSUER_URI:northstar-auth}
+    audience: ${JWT_AUDIENCE:northstar-portal}
+    ttl-minutes: ${JWT_TTL_MINUTES:60}
+bootstrap:
+  admin:
+    email: ${BOOTSTRAP_ADMIN_EMAIL:}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+    full-name: ${BOOTSTRAP_ADMIN_NAME:Northstar Administrator}
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: ${EUREKA_INSTANCE_PREFER_IP_ADDRESS:true}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,0 +1,42 @@
+server:
+  port: ${PORT:8083}
+spring:
+  application:
+    name: request-service
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/northstar_request_service?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${MYSQL_USER:northstar}
+    password: ${MYSQL_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:northstar}
+    password: ${RABBITMQ_PASSWORD:}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+security:
+  jwt:
+    secret: ${JWT_SIGNING_SECRET:}
+    issuer: ${JWT_ISSUER_URI:northstar-auth}
+    audience: ${JWT_AUDIENCE:northstar-portal}
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: ${EUREKA_INSTANCE_PREFER_IP_ADDRESS:true}
+request:
+  outbox:
+    poll-ms: ${OUTBOX_POLL_MS:1000}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
