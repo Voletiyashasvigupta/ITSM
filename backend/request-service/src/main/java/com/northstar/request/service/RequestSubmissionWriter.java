@@ -35,8 +35,14 @@ public class RequestSubmissionWriter {
         String fieldsJson;
         try { fieldsJson = mapper.writeValueAsString(input.fields() == null ? java.util.Map.of() : input.fields()); }
         catch (JsonProcessingException exception) { throw new IllegalArgumentException("Request fields are invalid", exception); }
-        ServiceRequestEntity entity = requests.saveAndFlush(new ServiceRequestEntity(
-                idempotencyKey, input.serviceName().trim(), input.description().trim(), requesterId, input.requestedForId().trim(), input.approverId().trim(), fieldsJson));
+        ServiceRequestEntity entity = new ServiceRequestEntity(
+                idempotencyKey, input.serviceName().trim(), input.description().trim(), requesterId, input.requestedForId().trim(), input.approverId().trim(), fieldsJson);
+        String customNum = input.fields() != null ? input.fields().get("requestNumber") : null;
+        if (customNum == null && input.fields() != null) customNum = input.fields().get("number");
+        if (customNum != null && !customNum.isBlank()) {
+            entity.setServiceNowNumber(customNum.trim());
+        }
+        entity = requests.saveAndFlush(entity);
         if (entity.getApproverId() != null && !entity.getApproverId().isBlank()) {
             approvals.save(new ApprovalEntity(entity.getId(), entity.getApproverId()));
         }

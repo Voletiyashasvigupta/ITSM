@@ -39,6 +39,11 @@ public class RequestController {
         return requests.list(jwt.getSubject(), isManager(jwt), pageable);
     }
 
+    @GetMapping("/next-number")
+    public java.util.Map<String, String> nextNumber() {
+        return java.util.Map.of("number", requests.generateNextNumber());
+    }
+
     @GetMapping("/{id}")
     public RequestDetailsResponse get(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) { return requests.get(id,jwt.getSubject(),isManager(jwt)); }
 

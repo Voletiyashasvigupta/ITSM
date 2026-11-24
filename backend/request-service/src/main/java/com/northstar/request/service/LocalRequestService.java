@@ -23,6 +23,7 @@ public interface LocalRequestService {
     java.util.List<RequestHistoryResponse> history(UUID id, String actor, boolean manager);
     RequestDetailsResponse transition(UUID id,String actor,RequestStatus target);
     RequestDetailsResponse cancel(UUID id, String actor, boolean manager);
+    String generateNextNumber();
 }
 
 @Service
@@ -35,6 +36,10 @@ class LocalRequestServiceImpl implements LocalRequestService {
         return page.map(this::toResponse);
     }
     @Override public RequestDetailsResponse get(UUID id, String actor, boolean manager) { ServiceRequestEntity r=find(id); assertRead(r,actor,manager); return toResponse(r); }
+    @Override public String generateNextNumber() {
+        long count = requests.count();
+        return String.format("REQ%07d", 10001 + count);
+    }
     @Override public java.util.List<RequestHistoryResponse> history(UUID id, String actor, boolean manager) {
         ServiceRequestEntity r=find(id); assertRead(r,actor,manager);
         return history.findByRequestIdOrderByCreatedAtAsc(id).stream().map(h -> new RequestHistoryResponse(h.getId(),h.getActorId(),h.getAction(),h.getFromStatus(),h.getToStatus(),h.getComment(),h.getCreatedAt())).toList();

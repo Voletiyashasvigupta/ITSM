@@ -34,8 +34,13 @@ public class BootstrapAdmin implements ApplicationRunner {
         if (email.isBlank() || password.length() < 12) {
             throw new IllegalStateException("Set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD (at least 12 characters)");
         }
-        if (!users.existsByEmail(email)) {
+        users.findByEmail(email).ifPresentOrElse(user -> {
+            user.setPasswordHash(passwords.encode(password));
+            user.setActive(true);
+            user.setRole(PortalRole.MANAGER_ADMIN);
+            users.save(user);
+        }, () -> {
             users.save(new PortalUser(name, email, passwords.encode(password), PortalRole.MANAGER_ADMIN, true));
-        }
+        });
     }
 }

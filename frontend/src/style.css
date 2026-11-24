@@ -685,3 +685,233 @@ kbd { font: 10px 'DM Sans', sans-serif; color: #939bad; background: #f1f3f7; bor
 .sn-lookup-item:hover {
   background-color: #eff6ff;
 }
+
+/* ServiceNow Request (REQ...) Styles */
+.sn-req-action-btn {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 4px !important;
+  padding: 4px 12px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+  min-height: 28px !important;
+}
+.sn-req-action-btn:hover {
+  background-color: #e2e8f0 !important;
+  border-color: #94a3b8 !important;
+}
+
+.sn-req-action-danger {
+  color: #dc2626 !important;
+  border-color: #fca5a5 !important;
+}
+.sn-req-action-danger:hover {
+  background-color: #fee2e2 !important;
+  border-color: #ef4444 !important;
+}
+
+.sn-req-action-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sn-info-badge {
+  font-size: 16px !important;
+  color: #64748b;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.sn-calendar-badge {
+  position: absolute !important;
+  right: 6px !important;
+  color: #64748b !important;
+  padding: 4px !important;
+}
+
+.sn-req-tabs-bar {
+  display: flex;
+  gap: 2px;
+  border-bottom: 2px solid #0284c7;
+  margin-top: 24px;
+  background-color: #f1f5f9;
+  border-radius: 4px 4px 0 0;
+  padding: 4px 8px 0 8px;
+}
+
+.sn-req-tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.15s ease;
+}
+.sn-req-tab:hover {
+  color: #0f172a;
+  background-color: #e2e8f0;
+}
+.sn-req-tab.active {
+  background-color: #ffffff;
+  color: #0284c7;
+  border-color: #cbd5e1;
+  border-bottom: 2px solid #ffffff;
+  margin-bottom: -2px;
+}
+
+.sn-ritm-container {
+  border: 1px solid #cbd5e1;
+  border-top: none;
+  background: #ffffff;
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+}
+
+.sn-ritm-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sn-ritm-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sn-ritm-toolbar-title {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+}
+
+.sn-ritm-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sn-ritm-search-input {
+  height: 26px;
+  padding: 2px 8px;
+  font-size: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  outline: none;
+}
+
+.sn-ritm-filter-bar {
+  padding: 6px 14px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #0284c7;
+  font-weight: 500;
+}
+
+.sn-ritm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.sn-ritm-table th {
+  background-color: #f8fafc;
+  color: #475569;
+  font-weight: 600;
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid #cbd5e1;
+  border-right: 1px solid #f1f5f9;
+}
+.sn-ritm-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #1e293b;
+  vertical-align: middle;
+}
+.sn-ritm-table tr:hover td {
+  background-color: #f8fafc;
+}
+
+.sn-ritm-link {
+  color: #0284c7;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.sn-stage-dots-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sn-stage-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+  background-color: #ffffff;
+  display: inline-block;
+}
+.sn-stage-dot.completed {
+  background-color: #10b981;
+  border-color: #059669;
+}
+.sn-stage-dot.in-progress {
+  background-color: #f59e0b;
+  border-color: #d97706;
+}
+.sn-stage-arrow {
+  color: #f59e0b;
+  font-size: 14px !important;
+}
+
+/* ==========================================================================
+   Shared Admin Dashboard (ServiceNow Service Operations Workspace)
+   ========================================================================== */
+
+.sn-admin-dash-container {
+  padding: 8px 4px 32px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.sn-admin-dash-kicker {
+  font-family: inherit;
+  letter-spacing: -0.1px;
+}
+
+.sn-admin-dash-header {
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 14px;
+}
+
+.sn-widget-card {
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.sn-widget-card:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.sn-widget-header {
+  user-select: none;
+}
+

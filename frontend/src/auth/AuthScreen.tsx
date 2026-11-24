@@ -35,8 +35,8 @@ export default function AuthScreen() {
   return <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, background: 'linear-gradient(135deg, #eef3f5 0%, #e2ecee 100%)' }}>
     <Paper component="form" onSubmit={submit} elevation={0} sx={{ width: 'min(100%, 430px)', p: { xs: 3, sm: 4 }, border: '1px solid #dfe8eb', borderRadius: 4 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-        <Box sx={{ width: 40, height: 40, borderRadius: 2, display: 'grid', placeItems: 'center', color: 'white', bgcolor: 'primary.main', fontWeight: 800, fontSize: 22 }}>N</Box>
-        <Box><Typography sx={{ fontWeight: 800, fontSize: 19, color: '#16324f' }}>Northstar Bank</Typography><Typography variant="caption" color="text.secondary">INTERNAL SERVICE HUB</Typography></Box>
+        <Box sx={{ width: 40, height: 40, borderRadius: 2, display: 'grid', placeItems: 'center', color: 'white', bgcolor: 'primary.main', fontWeight: 800, fontSize: 13, letterSpacing: '-0.5px' }}>ITSM</Box>
+        <Box><Typography sx={{ fontWeight: 800, fontSize: 19, color: '#16324f' }}>ITSM</Typography><Typography variant="caption" color="text.secondary">INTERNAL SERVICE HUB</Typography></Box>
       </Box>
       <Typography variant="h5" sx={{ fontWeight: 750, mb: 0.5 }}>{mode === 'login' ? 'Welcome back' : 'Create your account'}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>{mode === 'login' ? 'Sign in with your portal account.' : 'Register with your work email. Access is assigned by an administrator.'}</Typography>
@@ -50,6 +50,24 @@ export default function AuthScreen() {
       <TextField required fullWidth label="Work email" type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} sx={{ mb: 2 }} />
       <TextField required fullWidth label="Password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} slotProps={{ htmlInput: { minLength: mode === 'register' ? 12 : undefined, maxLength: 72 } }} value={password} onChange={(event) => setPassword(event.target.value)} helperText={mode === 'register' ? 'Use at least 12 characters.' : undefined} sx={{ mb: 2.5 }} />
       <Button type="submit" fullWidth variant="contained" size="large" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}</Button>
+      {mode === 'login' && (
+        <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f8fafc', borderRadius: 2, border: '1px dashed #cbd5e1', textAlign: 'center' }}>
+          <Typography variant="caption" sx={{ color: '#475569', display: 'block', mb: 0.75, fontWeight: 600 }}>
+            Quick Admin & Manager Login:
+          </Typography>
+          <Button
+            size="small"
+            variant="outlined"
+            fullWidth
+            onClick={() => {
+              setEmail('admin@northstar.local')
+              setPassword('NorthstarLocal2026!')
+            }}
+          >
+            Fill Admin Credentials (admin@northstar.local)
+          </Button>
+        </Box>
+      )}
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2 }}>Portal accounts are separate from ServiceNow credentials.</Typography>
     </Paper>
   </Box>

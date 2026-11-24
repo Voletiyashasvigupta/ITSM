@@ -49,44 +49,12 @@ public class RequestSubmissionService {
     private static void validateServiceFields(RequestSubmission input) {
         var fields = input.fields() == null ? java.util.Map.<String, String>of() : input.fields();
         java.util.List<String> required = switch (input.serviceName().trim()) {
-            case "Request a device" -> java.util.List.of("item", "workStyle", "location", "neededBy", "reason");
-            case "Access and accounts" -> java.util.List.of("accessType", "application", "accessLevel", "duration", "reason");
-            case "Workplace services" -> java.util.List.of("requestType", "location", "neededBy", "urgency", "reason");
-            case "People support" -> java.util.List.of("topic", "contactMethod", "reason");
-            default -> java.util.List.of();
+            case "Request a device" -> java.util.List.of("item", "reason");
+            case "Access and accounts" -> java.util.List.of("accessType", "reason");
+            case "Workplace services" -> java.util.List.of("requestType", "reason");
+            case "People support" -> java.util.List.of("topic", "reason");
+            default -> java.util.List.of("reason");
         };
-        required = new java.util.ArrayList<>(required);
-        String branch = switch (input.serviceName().trim()) {
-            case "Access and accounts" -> fields.get("accessType");
-            case "Workplace services" -> fields.get("requestType");
-            case "People support" -> fields.get("topic");
-            default -> null;
-        };
-        if (branch != null) required.addAll(switch (branch) {
-            case "New access" -> java.util.List.of("accessTarget","accessRoleDetails","accessStart");
-            case "Change existing access" -> java.util.List.of("accessTarget","currentAccess","newAccess");
-            case "Remove access" -> java.util.List.of("accessTarget","removeAccess","accessEnd");
-            case "Unlock account or reset sign-in" -> java.util.List.of("accountName","signInIssue");
-            case "Shared mailbox or distribution list" -> java.util.List.of("mailboxName","mailAction");
-            case "VPN or network access" -> java.util.List.of("networkLocation","networkDuration");
-            case "Hardware token / MFA" -> java.util.List.of("mfaAction");
-            case "Maintenance or repair" -> java.util.List.of("maintenanceType");
-            case "Parking" -> java.util.List.of("parkingType","parkingSchedule");
-            case "Office move or seating" -> java.util.List.of("moveFrom","moveTo","movePeople");
-            case "Access badge" -> java.util.List.of("badgeAction","badgeAreas");
-            case "Furniture or equipment" -> java.util.List.of("furnitureItem","furnitureQuantity");
-            case "Office supplies" -> java.util.List.of("supplyItems","deliveryPoint");
-            case "Cleaning or pest issue" -> java.util.List.of("cleaningArea");
-            case "Safety concern" -> java.util.List.of("safetyHazard","immediateRisk");
-            case "Benefits" -> java.util.List.of("benefitArea","benefitAction");
-            case "Payroll question" -> java.util.List.of("payrollArea","payPeriod");
-            case "Leave policy or balance" -> java.util.List.of("leaveType","leaveHelp");
-            case "Onboarding" -> java.util.List.of("onboardingStage","startDate","onboardingNeeds");
-            case "Employment verification" -> java.util.List.of("verificationPurpose","verificationDelivery");
-            case "Employment or workplace policy" -> java.util.List.of("policyArea");
-            case "Personal information update" -> java.util.List.of("profileUpdateArea","profileUpdateMethod");
-            default -> java.util.List.of();
-        });
         var missing = required.stream().filter(key -> fields.get(key) == null || fields.get(key).isBlank()).toList();
         if (!missing.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "Missing required request fields: " + String.join(", ", missing));
@@ -98,7 +66,7 @@ public class RequestSubmissionService {
             catch(java.time.format.DateTimeParseException invalid) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Field '"+key+"' must be an ISO calendar date"); }
         }
         if (input.approverId() == null || input.approverId().isBlank())
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "approverId is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Approver must be selected");
     }
 
     private static void verifyGatewayIdentity(String gatewayIdentity, String authenticatedUserId) {

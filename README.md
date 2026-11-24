@@ -52,10 +52,11 @@ mvn -f service-registry/pom.xml spring-boot:run
 mvn -f auth-service/pom.xml spring-boot:run
 mvn -f catalog-service/pom.xml spring-boot:run
 mvn -f request-service/pom.xml spring-boot:run
+$env:SPRING_PROFILES_ACTIVE = 'local'
 mvn -f api-gateway/pom.xml spring-boot:run
 ```
 
-Service ports and configuration are in each module’s `src/main/resources/application.yml`; the Gateway listens on port `8080`. Auth Service uses `northstar_auth`; Request Service uses `northstar_request_service`. The old `northstar_requests` schema from earlier local runs is left untouched. MySQL migrations run automatically for the new Request Service schema. RabbitMQ may be omitted; outbox failures are retried and logged, while portal data remains local.
+Service ports and configuration are in each module’s `src/main/resources/application.yml`. For this local run, the Gateway's `local` profile listens on port `7777`; Auth Service uses `northstar_auth`, and Request Service uses `northstar_request_service`. The old `northstar_requests` schema from earlier local runs is left untouched. MySQL migrations run automatically for the new Request Service schema. RabbitMQ may be omitted; outbox failures are retried and logged, while portal data remains local.
 
 Start the portal:
 
@@ -65,7 +66,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000`. The Vite proxy forwards `/api` calls to `http://localhost:8080`.
+Open `http://localhost:3000`. The Vite proxy forwards `/api` calls to `http://localhost:7777`.
 With `PORTAL_IMPERSONATION_ENABLED=true` set for the Auth Service, managers/administrators can choose **Test as user** from the account menu. A warning banner identifies the selected account; **Stop testing** restores the original session. Actions made during the session are real and saved as that user. Impersonation is disabled by default and should only be enabled in a local test environment.
 
 ## Docker Compose

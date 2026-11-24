@@ -38,6 +38,20 @@ import FileDownloadOutlined from '@mui/icons-material/FileDownloadOutlined'
 import PrintOutlined from '@mui/icons-material/PrintOutlined'
 import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined'
 import HistoryToggleOffRounded from '@mui/icons-material/HistoryToggleOffRounded'
+import ArrowBackRounded from '@mui/icons-material/ArrowBackRounded'
+import ArrowUpwardRounded from '@mui/icons-material/ArrowUpwardRounded'
+import ArrowDownwardRounded from '@mui/icons-material/ArrowDownwardRounded'
+import InfoOutlined from '@mui/icons-material/InfoOutlined'
+import CalendarTodayOutlined from '@mui/icons-material/CalendarTodayOutlined'
+import FilterListRounded from '@mui/icons-material/FilterListRounded'
+import PlayArrowRounded from '@mui/icons-material/PlayArrowRounded'
+import FirstPageRounded from '@mui/icons-material/FirstPageRounded'
+import LastPageRounded from '@mui/icons-material/LastPageRounded'
+import KeyboardArrowLeftRounded from '@mui/icons-material/KeyboardArrowLeftRounded'
+import TimelineRounded from '@mui/icons-material/TimelineRounded'
+import CheckRounded from '@mui/icons-material/CheckRounded'
+import AnalyticsRounded from '@mui/icons-material/AnalyticsRounded'
+import SharedAdminDashboard from './admin/SharedAdminDashboard'
 import AuthScreen from './auth/AuthScreen'
 import PasswordSettings from './auth/PasswordSettings'
 import UserAccessPage from './auth/UserAccessPage'
@@ -45,7 +59,7 @@ import { useAuth } from './auth/AuthContext'
 import type { PortalUser } from './auth/AuthContext'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-type Request = { id: string; backendId?: string; title: string; category: string; status: string; date: string; color: string; description?: string }
+type Request = { id: string; backendId?: string; title: string; category: string; status: string; date: string; createdAt?: string; color: string; description?: string }
 type Approval = { id: string; requestId: string; requestNumber: string; title: string; employee: string; initials: string; requested: string; decision?: string }
 type Approver = { id: string; fullName: string }
 type RequestReceiptData = { number: string; service: string; status: string; approver: string; createdAt: string; details: Array<{ label: string; value: string }> }
@@ -196,165 +210,36 @@ const services = [
   { title: 'People support', description: 'Benefits, onboarding and HR help', icon: <MedicalServicesRounded />, tint: 'tint-green', group: 'HR' },
 ]
 const serviceForms: Record<string, { intro: string; fields: RequestField[] }> = {
-  'Request a device': { intro: 'Choose the equipment and tell us how it will be used. Your answers help IT prepare the right device.', fields: [
+  'Request a device': { intro: 'Select equipment needed. Required fields only.', fields: [
     { name: 'item', label: 'What do you need?', kind: 'select', options: ['Laptop', 'Desktop computer', 'Monitor', 'Docking station', 'Keyboard or mouse', 'Headset or webcam', 'Mobile phone', 'Other'], required: true },
-    { name: 'workStyle', label: 'Primary work setup', kind: 'select', options: ['Office based', 'Hybrid', 'Remote'], required: true },
-    { name: 'location', label: 'Office or delivery location', kind: 'text', required: true, helper: 'Enter an office/site name. Do not include a home address.' },
     { name: 'neededBy', label: 'When do you need it?', kind: 'date', required: true },
     { name: 'reason', label: 'Business reason', kind: 'textarea', required: true },
   ] },
-  'Access and accounts': { intro: 'Request a new account or a change to your access. Include the application and the work you need to perform.', fields: [
+  'Access and accounts': { intro: 'Request application or directory access.', fields: [
     { name: 'accessType', label: 'What access help do you need?', kind: 'select', options: ['New access', 'Change existing access', 'Remove access', 'Unlock account or reset sign-in', 'Shared mailbox or distribution list', 'VPN or network access', 'Hardware token / MFA'], required: true },
     { name: 'application', label: 'Application, system, or shared resource', kind: 'text', required: true, helper: 'For example: SAP, Salesforce, a shared drive, or a team mailbox.' },
     { name: 'accessLevel', label: 'Access level needed', kind: 'select', options: ['Standard user', 'Read only', 'Contributor / editor', 'Approver', 'Other / not sure'], required: true },
     { name: 'duration', label: 'How long is access needed?', kind: 'select', options: ['Ongoing role requirement', 'Temporary — up to 30 days', 'Temporary — 1 to 6 months', 'Not sure'], required: true },
     { name: 'reason', label: 'Business justification', kind: 'textarea', required: true },
   ] },
-  'Workplace services': { intro: 'Tell the Facilities team what you need and which workplace is affected.', fields: [
+  'Workplace services': { intro: 'Submit a facilities service request.', fields: [
     { name: 'requestType', label: 'What workplace help do you need?', kind: 'select', options: ['Maintenance or repair', 'Parking', 'Office move or seating', 'Access badge', 'Furniture or equipment', 'Office supplies', 'Cleaning or pest issue', 'Safety concern', 'Other'], required: true },
-    { name: 'location', label: 'Office / site and room or area', kind: 'text', required: true },
     { name: 'neededBy', label: 'Preferred date', kind: 'date', required: true },
-    { name: 'urgency', label: 'Impact', kind: 'select', options: ['Routine', 'Affects my work', 'Affects a team or shared area', 'Safety concern'], required: true },
     { name: 'reason', label: 'Describe the issue or what is needed', kind: 'textarea', required: true },
   ] },
-  'People support': { intro: 'Select the HR topic and describe the help you need. Avoid entering medical, financial, or other sensitive personal details here.', fields: [
+  'People support': { intro: 'Submit an HR support inquiry.', fields: [
     { name: 'topic', label: 'What People team help do you need?', kind: 'select', options: ['Benefits', 'Payroll question', 'Leave policy or balance', 'Onboarding', 'Employment verification', 'Employment or workplace policy', 'Personal information update', 'Other'], required: true },
-    { name: 'contactMethod', label: 'Preferred follow-up', kind: 'select', options: ['Email', 'Phone or video call', 'No preference'], required: true },
-    { name: 'neededBy', label: 'When do you need a response?', kind: 'date' },
-    { name: 'reason', label: 'How can the People team help?', kind: 'textarea', required: true, helper: 'Please do not include bank details, health information, or government ID numbers.' },
+    { name: 'reason', label: 'How can the People team help?', kind: 'textarea', required: true },
   ] },
 }
-function deviceSpecificationFields(item: string | undefined): RequestField[] {
-  if (!item) return []
-  const fields: RequestField[] = [
-    { name: 'brandModel', label: 'Preferred brand or model (optional)', kind: 'text', helper: 'A preference only; availability and company standards will be checked.' },
-    { name: 'specificationNotes', label: 'Other specifications or compatibility needs', kind: 'textarea', helper: 'Mention required ports, software compatibility, accessibility needs, or other details.' },
-  ]
-  if (item === 'Laptop' || item === 'Desktop computer') fields.unshift(
-    { name: 'operatingSystem', label: 'Operating system', kind: 'select', options: ['Windows', 'macOS', 'Linux', 'No preference'] },
-    { name: 'memory', label: 'Memory (RAM)', kind: 'select', options: ['8 GB', '16 GB', '32 GB', '64 GB', 'No preference'] },
-    { name: 'storage', label: 'Storage', kind: 'select', options: ['256 GB SSD', '512 GB SSD', '1 TB SSD', '2 TB SSD', 'No preference'] },
-    { name: 'performance', label: 'Performance level', kind: 'select', options: ['Standard office work', 'Development / design', 'High performance', 'No preference'] },
-  )
-  else if (item === 'Monitor') fields.unshift(
-    { name: 'screenSize', label: 'Screen size', kind: 'select', options: ['24 inch', '27 inch', '32 inch', 'No preference'] },
-    { name: 'resolution', label: 'Resolution', kind: 'select', options: ['Full HD (1080p)', 'QHD (1440p)', '4K', 'No preference'] },
-  )
-  else if (item === 'Mobile phone') fields.unshift(
-    { name: 'phonePlatform', label: 'Preferred platform', kind: 'select', options: ['iOS', 'Android', 'No preference'] },
-    { name: 'phoneStorage', label: 'Storage capacity', kind: 'select', options: ['128 GB', '256 GB', '512 GB', 'No preference'] },
-  )
-  else if (item === 'Docking station' || item === 'Keyboard or mouse' || item === 'Headset or webcam') fields.unshift(
-    { name: 'deviceCompatibility', label: 'Connects to / compatible with', kind: 'text', helper: 'Enter your computer model, operating system, or connection type if known.' },
-  )
-  return fields
-}
 function conditionalRequestFields(service: string, values: Record<string, string>): RequestField[] {
-  if (service === 'Request a device') return deviceSpecificationFields(values.item)
-  if (service === 'Access and accounts') {
-    const shared: RequestField = { name: 'accessTarget', label: 'Who needs this access?', kind: 'text', required: true, helper: 'Enter the employee or team name. Do not enter a password.' }
-    switch (values.accessType) {
-      case 'New access': return [shared,
-        { name: 'accessRoleDetails', label: 'Role or permission requested', kind: 'text', required: true },
-        { name: 'accessStart', label: 'When should access begin?', kind: 'date', required: true },
-      ]
-      case 'Change existing access': return [shared,
-        { name: 'currentAccess', label: 'Current access level', kind: 'text', required: true },
-        { name: 'newAccess', label: 'What should change?', kind: 'text', required: true },
-      ]
-      case 'Remove access': return [shared,
-        { name: 'removeAccess', label: 'Which access should be removed?', kind: 'text', required: true },
-        { name: 'accessEnd', label: 'When should it be removed?', kind: 'date', required: true },
-      ]
-      case 'Unlock account or reset sign-in': return [
-        { name: 'accountName', label: 'Account username or work email', kind: 'text', required: true },
-        { name: 'signInIssue', label: 'Sign-in issue', kind: 'select', options: ['Account locked', 'Forgot password', 'MFA problem', 'Other'], required: true },
-      ]
-      case 'Shared mailbox or distribution list': return [
-        { name: 'mailboxName', label: 'Mailbox or list name', kind: 'text', required: true },
-        { name: 'mailAction', label: 'What do you need?', kind: 'select', options: ['Create', 'Add member', 'Remove member', 'Change owner', 'Send as / send on behalf'], required: true },
-        { name: 'mailMembers', label: 'People to add or remove', kind: 'textarea' },
-      ]
-      case 'VPN or network access': return [
-        { name: 'networkLocation', label: 'Network or location needed', kind: 'text', required: true },
-        { name: 'networkDuration', label: 'Access duration', kind: 'select', options: ['Ongoing', 'Up to 30 days', '1 to 6 months'], required: true },
-      ]
-      case 'Hardware token / MFA': return [
-        { name: 'mfaAction', label: 'MFA help needed', kind: 'select', options: ['Enroll a new device', 'Replace a lost or broken token', 'Reset MFA', 'Troubleshoot sign-in'], required: true },
-      ]
-      default: return []
-    }
-  }
-  if (service === 'Workplace services') {
-    switch (values.requestType) {
-      case 'Maintenance or repair': return [
-        { name: 'maintenanceType', label: 'Type of issue', kind: 'select', options: ['Electrical / lighting', 'Heating / cooling', 'Plumbing', 'Door / lock', 'Furniture', 'Other'], required: true },
-        { name: 'assetReference', label: 'Asset or room reference (if known)', kind: 'text' },
-      ]
-      case 'Parking': return [
-        { name: 'parkingType', label: 'Parking request', kind: 'select', options: ['New permit', 'Renew permit', 'Change permit', 'Visitor parking'], required: true },
-        { name: 'parkingSchedule', label: 'Days or schedule needed', kind: 'text', required: true },
-      ]
-      case 'Office move or seating': return [
-        { name: 'moveFrom', label: 'Current office / area', kind: 'text', required: true },
-        { name: 'moveTo', label: 'New office / area or team', kind: 'text', required: true },
-        { name: 'movePeople', label: 'Number of people affected', kind: 'select', options: ['Just me', '2–5', '6–20', 'More than 20'], required: true },
-      ]
-      case 'Access badge': return [
-        { name: 'badgeAction', label: 'Badge request', kind: 'select', options: ['New badge', 'Replace damaged badge', 'Report lost badge', 'Change access areas'], required: true },
-        { name: 'badgeAreas', label: 'Building or access areas needed', kind: 'text', required: true },
-      ]
-      case 'Furniture or equipment': return [
-        { name: 'furnitureItem', label: 'Item needed', kind: 'select', options: ['Desk', 'Chair', 'Storage', 'Ergonomic equipment', 'Meeting room equipment', 'Other'], required: true },
-        { name: 'furnitureQuantity', label: 'Quantity', kind: 'text', required: true },
-      ]
-      case 'Office supplies': return [
-        { name: 'supplyItems', label: 'Supplies and quantities', kind: 'textarea', required: true },
-        { name: 'deliveryPoint', label: 'Delivery point / department', kind: 'text', required: true },
-      ]
-      case 'Cleaning or pest issue': return [
-        { name: 'cleaningArea', label: 'Area affected', kind: 'text', required: true },
-        { name: 'cleaningTime', label: 'Best time to access the area', kind: 'text' },
-      ]
-      case 'Safety concern': return [
-        { name: 'safetyHazard', label: 'Type of safety concern', kind: 'select', options: ['Slip / trip hazard', 'Damaged equipment', 'Blocked exit', 'Other'], required: true },
-        { name: 'immediateRisk', label: 'Is anyone at immediate risk?', kind: 'select', options: ['Yes', 'No', 'Not sure'], required: true, helper: 'For immediate danger, contact local emergency or site safety staff now.' },
-      ]
-      default: return []
-    }
-  }
-  if (service === 'People support') {
-    switch (values.topic) {
-      case 'Benefits': return [
-        { name: 'benefitArea', label: 'Benefits area', kind: 'select', options: ['Health / wellbeing', 'Retirement', 'Insurance', 'Enrollment or eligibility', 'Other'], required: true },
-        { name: 'benefitAction', label: 'What help do you need?', kind: 'select', options: ['Information', 'How to enroll', 'Update or correction', 'Resolve an issue'], required: true },
-      ]
-      case 'Payroll question': return [
-        { name: 'payrollArea', label: 'Payroll topic', kind: 'select', options: ['Pay statement', 'Pay date', 'Hours or overtime', 'Tax form', 'Other'], required: true },
-        { name: 'payPeriod', label: 'Pay period or date in question', kind: 'text', required: true, helper: 'Do not include bank account or tax ID numbers.' },
-      ]
-      case 'Leave policy or balance': return [
-        { name: 'leaveType', label: 'Leave type', kind: 'select', options: ['Annual / vacation', 'Sick leave', 'Parental', 'Unpaid', 'Other / not sure'], required: true },
-        { name: 'leaveHelp', label: 'What do you need help with?', kind: 'select', options: ['Understand policy', 'How to submit a request', 'Balance question', 'Correct an existing entry'], required: true },
-      ]
-      case 'Onboarding': return [
-        { name: 'onboardingStage', label: 'Onboarding stage', kind: 'select', options: ['Before first day', 'First week', 'New team / role change'], required: true },
-        { name: 'startDate', label: 'Start date', kind: 'date', required: true },
-        { name: 'onboardingNeeds', label: 'Support needed', kind: 'select', options: ['Documents / process', 'Orientation', 'Benefits enrollment', 'Other'], required: true },
-      ]
-      case 'Employment verification': return [
-        { name: 'verificationPurpose', label: 'Purpose', kind: 'select', options: ['Rental / mortgage', 'Visa / immigration', 'Loan', 'Other'], required: true },
-        { name: 'verificationDelivery', label: 'How should the letter be delivered?', kind: 'select', options: ['To me', 'Directly to the requesting organization'], required: true },
-      ]
-      case 'Employment or workplace policy': return [
-        { name: 'policyArea', label: 'Policy area', kind: 'select', options: ['Code of conduct', 'Remote work', 'Expenses', 'Timekeeping', 'Other'], required: true },
-      ]
-      case 'Personal information update': return [
-        { name: 'profileUpdateArea', label: 'Information to update', kind: 'select', options: ['Preferred name', 'Work contact details', 'Emergency contact', 'Other'], required: true },
-        { name: 'profileUpdateMethod', label: 'What help is needed?', kind: 'select', options: ['How to update it', 'Request a correction', 'System access issue'], required: true },
-      ]
-      default: return []
-    }
+  if (service === 'Access and accounts' && values.accessType === 'New access') {
+    const shared: RequestField = { name: 'accessTarget', label: 'Who needs this access?', kind: 'text', required: true, helper: 'Enter the employee or team name.' }
+    return [
+      shared,
+      { name: 'accessRoleDetails', label: 'Role or permission requested', kind: 'text', required: true },
+      { name: 'accessStart', label: 'When should access begin?', kind: 'date', required: true },
+    ]
   }
   return []
 }
@@ -364,6 +249,7 @@ const employeeNav = [
   { label: 'My requests', icon: <ReceiptLongRounded /> },
 ]
 const managementNav = [
+  { label: 'Admin dashboard', icon: <AnalyticsRounded /> },
   { label: 'Requests', icon: <ReceiptLongRounded /> },
   { label: 'Approvals', icon: <TaskAltRounded /> },
   { label: 'User access', icon: <ManageAccountsRounded /> },
@@ -376,7 +262,8 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, loading: authLoading, logout, apiFetch, isImpersonating, impersonate, stopImpersonating } = useAuth()
-  const [active, setActive] = useState('Overview')
+  const isManagerAdmin = user?.role === 'MANAGER_ADMIN'
+  const [active, setActive] = useState(isManagerAdmin ? 'Admin dashboard' : 'Overview')
   const [requests, setRequests] = useState(initialRequests)
   const [approvals, setApprovals] = useState<Approval[]>(initialApprovals)
   const [busy, setBusy] = useState(false)
@@ -404,6 +291,12 @@ export default function App() {
   const [suggestionsAnchor, setSuggestionsAnchor] = useState<HTMLElement | null>(null)
   const [query, setQuery] = useState('')
   const [toast, setToast] = useState('')
+  useEffect(() => {
+    if (toast) {
+      const timer = window.setTimeout(() => setToast(''), 2000)
+      return () => window.clearTimeout(timer)
+    }
+  }, [toast])
   const [liveCatalog, setLiveCatalog] = useState<LiveCatalogItem[]>([])
   const [catalogStale, setCatalogStale] = useState(false)
   const [catalogFilter, setCatalogFilter] = useState('All teams')
@@ -419,8 +312,32 @@ export default function App() {
   const [impersonationUserId, setImpersonationUserId] = useState('')
   const [impersonationBusy, setImpersonationBusy] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
-  const routeToPage: Record<string,string> = { '/': 'Overview', '/catalog': 'Service catalog', '/requests': 'My requests', '/manage/requests': 'Requests', '/approvals': 'Approvals', '/incidents': 'Incidents', '/access': 'User access', '/settings': 'Settings', '/requests/receipt': 'Request receipt' }
-  const pageToRoute: Record<string,string> = { 'Overview': '/', 'Service catalog': '/catalog', 'My requests': '/requests', 'Requests': '/manage/requests', 'Approvals': '/approvals', 'Incidents': '/incidents', 'User access': '/access', 'Settings': '/settings', 'Request receipt': '/requests/receipt' }
+  const routeToPage: Record<string,string> = {
+    '/': isManagerAdmin ? 'Admin dashboard' : 'Overview',
+    '/dashboard': 'Admin dashboard',
+    '/manage/dashboard': 'Admin dashboard',
+    '/catalog': 'Service catalog',
+    '/requests': 'My requests',
+    '/manage/requests': 'Requests',
+    '/approvals': 'Approvals',
+    '/incidents': 'Incidents',
+    '/access': 'User access',
+    '/settings': 'Settings',
+    '/requests/receipt': 'Request receipt',
+  }
+  const pageToRoute: Record<string,string> = {
+    'Overview': isManagerAdmin ? '/dashboard' : '/',
+    'Admin dashboard': isManagerAdmin ? '/' : '/manage/dashboard',
+    'Dashboard': '/dashboard',
+    'Service catalog': '/catalog',
+    'My requests': '/requests',
+    'Requests': '/manage/requests',
+    'Approvals': '/approvals',
+    'Incidents': '/incidents',
+    'User access': '/access',
+    'Settings': '/settings',
+    'Request receipt': '/requests/receipt',
+  }
   useEffect(() => {
     const requestPath = location.pathname.match(/^\/requests\/([0-9a-f-]{36})$/i)
     if (requestPath) {
@@ -436,7 +353,11 @@ export default function App() {
     }
     const page = routeToPage[location.pathname]
     if (page) { if (active !== page) setActive(page); if (location.pathname !== '/requests/new') setSelectedService(null) }
-    if (location.pathname === '/requests/new') { setActive('Service catalog'); setSelectedService(new URLSearchParams(location.search).get('service')) }
+    if (location.pathname === '/requests/new') {
+      setActive('Service catalog')
+      const svc = new URLSearchParams(location.search).get('service')
+      if (svc && !selectedService) void openServiceForm(svc)
+    }
   }, [location.pathname, location.search])
   useEffect(() => {
     if (selectedService) { navigate(`/requests/new?service=${encodeURIComponent(selectedService)}`); return }
@@ -444,7 +365,7 @@ export default function App() {
     if (path && location.pathname !== path) navigate(path)
   }, [active, selectedService])
   useEffect(() => {
-    setActive('Overview')
+    setActive(isManagerAdmin ? 'Admin dashboard' : 'Overview')
     setRequests([])
     setApprovals([])
     setIncidentRows([])
@@ -457,7 +378,64 @@ export default function App() {
     setCatalogStale(false)
     setCatalogFilter('All teams')
     setApprovers([])
-  }, [user?.id])
+  }, [user?.id, isManagerAdmin])
+
+  const [navHistory, setNavHistory] = useState<string[]>([])
+  const lastActiveRef = useRef(active)
+
+  useEffect(() => {
+    if (active !== lastActiveRef.current) {
+      const prev = lastActiveRef.current
+      setNavHistory((prevHistory) => {
+        if (prevHistory[prevHistory.length - 1] === prev) return prevHistory
+        return [...prevHistory, prev]
+      })
+      lastActiveRef.current = active
+    }
+  }, [active])
+
+  function handleGlobalBack() {
+    if (selectedService) {
+      setSelectedService(null)
+      setRequestFields({})
+      return
+    }
+    if (incidentFormOpen) {
+      setIncidentFormOpen(false)
+      return
+    }
+    if (active === 'Incident Detail') {
+      setActive('Incidents')
+      setIncidentDetail(null)
+      return
+    }
+    if (active === 'Request Detail') {
+      setActive(isManagerAdmin ? 'Requests' : 'My requests')
+      setRequestDetail(null)
+      return
+    }
+    if (active === 'Request receipt') {
+      setActive(isManagerAdmin ? 'Requests' : 'My requests')
+      setReceipt(null)
+      return
+    }
+    if (navHistory.length > 0) {
+      const prev = navHistory[navHistory.length - 1]
+      setNavHistory((h) => h.slice(0, -1))
+      lastActiveRef.current = prev
+      setActive(prev)
+      return
+    }
+    if (window.history.state && typeof window.history.state.idx === 'number' && window.history.state.idx > 0) {
+      navigate(-1)
+      return
+    }
+    if (active !== 'Admin dashboard' && active !== 'Overview') {
+      setActive(isManagerAdmin ? 'Admin dashboard' : 'Overview')
+    } else {
+      setActive('Service catalog')
+    }
+  }
 
   const loadWorkspace = async () => {
     setWorkspaceLoading(true); setWorkspaceError('')
@@ -469,13 +447,33 @@ export default function App() {
       const requestPage = await requestResponse.json() as { content?: Array<{ id: string; requestNumber: string; serviceName: string; status: string; createdAt: string; description: string }> }
       const approvalData = await approvalResponse.json() as Array<{ id: string; requestId: string; requestNumber: string; serviceName: string; requesterId: string; createdAt: string; decision: string }>
       const incidentData = await incidentResponse.json() as IncidentRecord[]
-      setRequests((requestPage.content ?? []).map((r) => ({ backendId: r.id, id: r.requestNumber, title: r.serviceName, category: 'Service request', status: r.status.replaceAll('_', ' '), date: new Date(r.createdAt).toLocaleDateString(), color: 'amber', description: r.description })))
+      setRequests((requestPage.content ?? []).map((r) => ({ backendId: r.id, id: r.requestNumber, title: r.serviceName, category: 'Service request', status: r.status.replaceAll('_', ' '), date: new Date(r.createdAt).toLocaleDateString(), createdAt: r.createdAt, color: 'amber', description: r.description })))
       setApprovals(approvalData.filter((a) => a.decision === 'PENDING').map((a) => ({ id: a.id, requestId: a.requestId, requestNumber: a.requestNumber, title: a.serviceName, employee: a.requesterId, initials: a.requesterId.slice(0, 2).toUpperCase(), requested: new Date(a.createdAt).toLocaleDateString() })))
       setIncidentRows(incidentData)
     } catch (cause) { setWorkspaceError(cause instanceof Error ? cause.message : 'Workspace data could not be loaded.') }
     finally { setWorkspaceLoading(false) }
   }
-  useEffect(() => { if (user) void loadWorkspace() }, [user?.id])
+  useEffect(() => {
+    if (!user) return
+    void loadWorkspace()
+    const timer = window.setInterval(() => {
+      Promise.all([
+        apiFetch('/api/requests?page=0&size=50'),
+        apiFetch('/api/approvals/pending'),
+        apiFetch('/api/incidents'),
+      ]).then(async ([requestResponse, approvalResponse, incidentResponse]) => {
+        if (requestResponse.ok && approvalResponse.ok && incidentResponse.ok) {
+          const requestPage = await requestResponse.json() as { content?: Array<{ id: string; requestNumber: string; serviceName: string; status: string; createdAt: string; description: string }> }
+          const approvalData = await approvalResponse.json() as Array<{ id: string; requestId: string; requestNumber: string; serviceName: string; requesterId: string; createdAt: string; decision: string }>
+          const incidentData = await incidentResponse.json() as IncidentRecord[]
+          setRequests((requestPage.content ?? []).map((r) => ({ backendId: r.id, id: r.requestNumber, title: r.serviceName, category: 'Service request', status: r.status.replaceAll('_', ' '), date: new Date(r.createdAt).toLocaleDateString(), createdAt: r.createdAt, color: 'amber', description: r.description })))
+          setApprovals(approvalData.filter((a) => a.decision === 'PENDING').map((a) => ({ id: a.id, requestId: a.requestId, requestNumber: a.requestNumber, title: a.serviceName, employee: a.requesterId, initials: a.requesterId.slice(0, 2).toUpperCase(), requested: new Date(a.createdAt).toLocaleDateString() })))
+          setIncidentRows(incidentData)
+        }
+      }).catch(() => undefined)
+    }, 5000)
+    return () => window.clearInterval(timer)
+  }, [user?.id, apiFetch])
   useEffect(() => {
     if (!user || user.role !== 'MANAGER_ADMIN' || isImpersonating) return
     void apiFetch('/api/auth/admin/users').then(async (response) => {
@@ -538,7 +536,6 @@ export default function App() {
 
     return [...kbResults, ...catResults]
   }, [effectiveIncidentQuery, incidentSearchFilter, displayedCatalog])
-  const isManagerAdmin = user?.role === 'MANAGER_ADMIN'
   const firstName = user?.fullName.split(/\s+/)[0] ?? 'there'
   const initials = user?.fullName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() ?? 'N'
   const title = selectedService ? selectedService : active === 'Overview' ? `Good morning, ${firstName}` : active
@@ -618,7 +615,7 @@ export default function App() {
       const result = await response.json() as { id: string; requestNumber?: string; status: string; createdAt?: string }
       const dateValue = result.createdAt ? new Date(result.createdAt) : new Date()
       const date = dateValue.toLocaleDateString()
-      const requestNumber = result.requestNumber || `NSR-${dateValue.toISOString().slice(0, 10).replace(/-/g, '')}-${(result.id || crypto.randomUUID()).replace(/-/g, '').slice(0, 8).toUpperCase()}`
+      const requestNumber = result.requestNumber || requestFields.requestNumber || `NSR-${dateValue.toISOString().slice(0, 10).replace(/-/g, '')}-${(result.id || crypto.randomUUID()).replace(/-/g, '').slice(0, 8).toUpperCase()}`
       const status = result.status.replaceAll('_', ' ')
       setRequests((current) => [{ id: requestNumber, backendId: result.id, title: service, category: 'New request', status, date, color: 'amber', description: details.replace(/\n/g, ' · ') }, ...current])
       setReceipt({ number: requestNumber, service, status, approver: approverName, createdAt: dateValue.toLocaleString(), details: [...detailItems, { label: 'Approver', value: approverName }] })
@@ -642,6 +639,19 @@ export default function App() {
       setToast(approve ? 'Request approved.' : 'Request rejected.')
     } catch (cause) { setToast(cause instanceof Error ? cause.message : 'Approval could not be saved.') }
     window.setTimeout(() => setToast(''), 5000)
+  }
+
+  async function openServiceForm(serviceTitle: string) {
+    let nextNum = 'REQ' + String(10001 + requests.length).padStart(7, '0')
+    try {
+      const res = await apiFetch('/api/requests/next-number')
+      if (res.ok) {
+        const data = await res.json() as { number?: string }
+        if (data.number) nextNum = data.number
+      }
+    } catch {}
+    setRequestFields({ requestNumber: nextNum })
+    setSelectedService(serviceTitle)
   }
 
   async function openNewIncidentForm() {
@@ -921,16 +931,27 @@ export default function App() {
 
   return <Box className="app-shell">
     <Box component="aside" className="sidebar">
-      <Box className="brand"><Box className="brand-mark">N</Box><Box><Typography className="brand-name">Northstar Bank</Typography><Typography className="brand-caption">SERVICE HUB</Typography></Box></Box>
+      <Box className="brand"><Box className="brand-mark" sx={{ fontSize: '11px', fontWeight: 800, letterSpacing: '-0.5px' }}>ITSM</Box><Box><Typography className="brand-name">ITSM</Typography><Typography className="brand-caption">SERVICE HUB</Typography></Box></Box>
       <Box className="workspace-label">WORKSPACE</Box>
       <List className="nav-list" disablePadding>
-        {employeeNav.map((item) => <ListItemButton key={item.label} selected={active === item.label} onClick={() => { setSelectedService(null); setRequestFields({}); setActive(item.label) }} className="nav-item">
+        {(isManagerAdmin
+          ? [
+              { label: 'Admin dashboard', icon: <AnalyticsRounded /> },
+              { label: 'Service catalog', icon: <SearchRounded /> },
+              { label: 'My requests', icon: <ReceiptLongRounded /> },
+            ]
+          : employeeNav
+        ).map((item) => <ListItemButton key={item.label} selected={active === item.label || (isManagerAdmin && item.label === 'Admin dashboard' && active === 'Overview')} onClick={() => { setSelectedService(null); setRequestFields({}); setActive(item.label) }} className="nav-item">
           <ListItemIcon>{item.icon}</ListItemIcon><ListItemText primary={item.label} />
         </ListItemButton>)}
         <ListItemButton selected={active === incidentNav.label} onClick={() => { setSelectedService(null); setActive(incidentNav.label) }} className="nav-item"><ListItemIcon>{incidentNav.icon}</ListItemIcon><ListItemText primary={incidentNav.label} /></ListItemButton>
       </List>
       {isManagerAdmin && <><Box className="workspace-label management-label">MANAGEMENT</Box><List className="nav-list" disablePadding>
-        {managementNav.map((item) => <ListItemButton key={item.label} selected={active === item.label} onClick={() => { setSelectedService(null); setRequestFields({}); setActive(item.label) }} className="nav-item">
+        {[
+          { label: 'Requests', icon: <ReceiptLongRounded /> },
+          { label: 'Approvals', icon: <TaskAltRounded /> },
+          { label: 'User access', icon: <ManageAccountsRounded /> },
+        ].map((item) => <ListItemButton key={item.label} selected={active === item.label} onClick={() => { setSelectedService(null); setRequestFields({}); setActive(item.label) }} className="nav-item">
           <ListItemIcon>{item.icon}</ListItemIcon><ListItemText primary={item.label} />
         </ListItemButton>)}
       </List></>}
@@ -941,7 +962,31 @@ export default function App() {
 
     <Box className="main-column">
       <AppBar position="static" elevation={0} color="transparent" className="topbar"><Toolbar className="topbar-inner">
-        <Typography className="crumb">Workspace <span>/</span> {active}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<ArrowBackRounded sx={{ fontSize: 16 }} />}
+            onClick={handleGlobalBack}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: 12,
+              borderColor: '#cbd5e1',
+              color: '#334155',
+              bgcolor: '#ffffff',
+              px: 1.25,
+              py: 0.35,
+              minHeight: 28,
+              borderRadius: 1,
+              boxShadow: 'none',
+              '&:hover': { bgcolor: '#f8fafc', borderColor: '#94a3b8' },
+            }}
+          >
+            Back
+          </Button>
+          <Typography className="crumb">Workspace <span>/</span> {active}</Typography>
+        </Box>
         <Box className="topbar-actions"><TextField inputRef={searchRef} size="small" placeholder="Search services" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { setSelectedService(null); setRequestFields({}); setActive('Service catalog') } }} className="search-field" slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small" /></InputAdornment>, endAdornment: <InputAdornment position="end"><IconButton aria-label="Search services" size="small" onClick={() => { setSelectedService(null); setRequestFields({}); setActive('Service catalog') }}><SearchRounded fontSize="small" /></IconButton><kbd>Ctrl K</kbd></InputAdornment> } }} />
           <IconButton aria-label="Notifications" className="notification-button" onClick={(event) => setNotificationsAnchor(event.currentTarget)}><Badge color="error" badgeContent={requests.length} max={9}><NotificationsNoneRounded /></Badge></IconButton>
           <IconButton aria-label="Open account menu" onClick={(event) => setProfileAnchor(event.currentTarget)} sx={{ p: 0 }}><Avatar className="top-avatar">{initials}</Avatar></IconButton>
@@ -957,7 +1002,16 @@ export default function App() {
           <DialogContent><Typography color="text.secondary" sx={{ mb: 2 }}>Choose an active account with assigned portal access. This uses that user’s permissions and saves any actions to their account.</Typography><FormControl fullWidth><InputLabel id="impersonation-user-label">User account</InputLabel><Select labelId="impersonation-user-label" label="User account" value={impersonationUserId} onChange={(event) => setImpersonationUserId(event.target.value)}>{impersonationUsers.map((candidate) => <MenuItem key={candidate.id} value={candidate.id}>{candidate.fullName} · {candidate.email} ({candidate.role === 'MANAGER_ADMIN' ? 'Manager + Administrator' : 'Employee'})</MenuItem>)}</Select></FormControl>{impersonationUsers.length === 0 && <Typography color="text.secondary" sx={{ mt: 1 }}>No other active accounts with assigned access are available.</Typography>}</DialogContent>
           <DialogActions><Button disabled={impersonationBusy} onClick={() => setImpersonationOpen(false)}>Cancel</Button><Button variant="contained" disabled={impersonationBusy || !impersonationUserId} onClick={() => { setImpersonationBusy(true); void impersonate(impersonationUserId).then(() => { setImpersonationOpen(false); setActive('Overview') }).catch((cause) => setToast(cause instanceof Error ? cause.message : 'Could not start user testing.')).finally(() => setImpersonationBusy(false)) }}>{impersonationBusy ? 'Starting…' : 'Start testing'}</Button></DialogActions>
         </Dialog>
-        <Box className="page-heading"><Box><Typography className="eyebrow">{selectedService ? 'SERVICE REQUEST' : todayLabel}</Typography><Typography variant="h4" className="page-title">{title}</Typography><Typography className="page-subtitle">{selectedService ? 'Complete the details below so the right team can handle your request.' : active === 'Overview' ? 'Your internal banking services, requests, and approvals.' : `Manage your ${active.toLowerCase()} in one place.`}</Typography></Box>{!selectedService && <Button variant="contained" startIcon={<ControlPointRounded />} onClick={() => setActive('Service catalog')}>New request</Button>}</Box>
+        {active !== 'Admin dashboard' && (!isManagerAdmin || (active !== 'Overview' && active !== 'Dashboard')) && (
+          <Box className="page-heading">
+            <Box>
+              <Typography className="eyebrow">{selectedService ? 'SERVICE REQUEST' : todayLabel}</Typography>
+              <Typography variant="h4" className="page-title">{title}</Typography>
+              <Typography className="page-subtitle">{selectedService ? 'Complete the details below so the right team can handle your request.' : active === 'Overview' ? 'Your internal banking services, requests, and approvals.' : `Manage your ${active.toLowerCase()} in one place.`}</Typography>
+            </Box>
+            {!selectedService && <Button variant="contained" startIcon={<ControlPointRounded />} onClick={() => setActive('Service catalog')}>New request</Button>}
+          </Box>
+        )}
         <Box key={`${active}-${selectedService ?? ''}`} className="page-transition">
         {toast && <Paper className="toast"><TaskAltRounded />{toast}</Paper>}
         {workspaceError && <Alert severity="error" action={<Button color="inherit" size="small" onClick={() => void loadWorkspace()}>Retry</Button>} sx={{ mb: 2 }}>{workspaceError}</Alert>}
@@ -1048,7 +1102,20 @@ export default function App() {
               Add comment
             </Button>
           </Paper>
-        ) : active === 'Request Detail' && requestDetail ? <RequestDetailReport request={requestDetail} history={requestHistory} requesterName={user?.id === requestDetail.requesterId ? user.fullName : impersonationUsers.find((candidate) => candidate.id === requestDetail.requesterId)?.fullName || requestDetail.requesterId} requestedForName={user?.id === requestDetail.requestedForId ? user.fullName : impersonationUsers.find((candidate) => candidate.id === requestDetail.requestedForId)?.fullName || requestDetail.requestedForId} approverName={approvers.find((candidate) => candidate.id === requestDetail.approverId)?.fullName} onBack={() => { setActive(isManagerAdmin ? 'Requests' : 'My requests'); setRequestDetail(null) }} /> : selectedService ? <ServiceRequestForm service={selectedService} values={requestFields} setValues={setRequestFields} approvers={approvers} approversLoading={approversLoading} busy={busy} onCancel={() => { setSelectedService(null); setRequestFields({}) }} onSubmit={() => void submitRequest(selectedService)} /> : active === 'Request receipt' && receipt ? <RequestReceipt receipt={receipt} onRequests={() => setActive('My requests')} onCatalog={() => setActive('Service catalog')} /> : active === 'Settings' ? <PasswordSettings /> : active === 'User access' && isManagerAdmin ? <UserAccessPage /> : active === 'Incidents' ? (
+        ) : active === 'Request Detail' && requestDetail ? (
+          <RequestDetailReport
+            request={requestDetail}
+            history={requestHistory}
+            requesterName={user?.id === requestDetail.requesterId ? user.fullName : impersonationUsers.find((candidate) => candidate.id === requestDetail.requesterId)?.fullName || requestDetail.requesterId}
+            requestedForName={user?.id === requestDetail.requestedForId ? user.fullName : impersonationUsers.find((candidate) => candidate.id === requestDetail.requestedForId)?.fullName || requestDetail.requestedForId}
+            approverName={approvers.find((candidate) => candidate.id === requestDetail.approverId)?.fullName}
+            onBack={() => { setActive(isManagerAdmin ? 'Requests' : 'My requests'); setRequestDetail(null) }}
+            apiFetch={apiFetch}
+            setToast={setToast}
+            onRefreshWorkspace={loadWorkspace}
+            onAddItem={() => setActive('Service catalog')}
+          />
+        ) : selectedService ? <ServiceRequestForm service={selectedService} values={requestFields} setValues={setRequestFields} approvers={approvers} approversLoading={approversLoading} busy={busy} onCancel={() => { setSelectedService(null); setRequestFields({}) }} onSubmit={() => void submitRequest(selectedService)} /> : active === 'Request receipt' && receipt ? <RequestReceipt receipt={receipt} onRequests={() => setActive('My requests')} onCatalog={() => setActive('Service catalog')} /> : active === 'Settings' ? <PasswordSettings /> : active === 'User access' && isManagerAdmin ? <UserAccessPage /> : (active === 'Admin dashboard' || (isManagerAdmin && (active === 'Overview' || active === 'Dashboard'))) ? <SharedAdminDashboard requestsCount={requests.length} pendingApprovalsCount={approvals.length} openIncidentsCount={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status)).length} p1IncidentsCount={incidentRows.filter((i) => i.priority?.includes('1') || i.priority?.toLowerCase().includes('critical')).length} incidentsList={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status))} requestsList={requests} onNavigate={(page) => setActive(page)} onRefresh={loadWorkspace} onOpenIncident={openIncident} onOpenRequest={openRequest} onBack={handleGlobalBack} setToast={setToast} /> : active === 'Incidents' ? (
           <Paper className="content-card">
             <Box className="section-heading in-card">
               <Box>
@@ -1530,7 +1597,7 @@ export default function App() {
                                       variant="contained"
                                       onClick={() => {
                                         setIncidentFormOpen(false);
-                                        setSelectedService(result.title);
+                                        void openServiceForm(result.title);
                                       }}
                                     >
                                       Start request
@@ -1593,7 +1660,7 @@ export default function App() {
           <Paper className="catalog-banner"><Box><Typography className="banner-kicker">SERVICE CATALOG</Typography><Typography variant="h5" className="banner-title">How can we help?</Typography><Typography className="banner-copy">Find the right service and we’ll take it from there.</Typography></Box><SupportAgentRounded className="banner-art" /></Paper>
           <Box className="catalog-toolbar"><Box><Typography variant="h6">Browse by team</Typography><Typography className="section-note">Choose a team to narrow the service list.</Typography></Box><Box className="catalog-filters">{['All teams', 'IT', 'Facilities', 'HR'].map((team) => <Chip key={team} label={team} clickable color={catalogFilter === team ? 'primary' : 'default'} variant={catalogFilter === team ? 'filled' : 'outlined'} onClick={() => setCatalogFilter(team)} />)}</Box></Box>
           {!liveCatalog.length && <Alert severity="warning" sx={{ mb: 2 }}>The live catalog is unavailable. These sample services can be used for local requests.</Alert>}<Box className="section-heading catalog-list-heading"><Box><Typography variant="h6">Available services</Typography><Typography className="section-note">{displayedCatalog.length} {displayedCatalog.length === 1 ? 'service' : 'services'} match your selection.</Typography></Box><Chip label={liveCatalog.length ? (catalogStale ? 'Last known data' : 'ServiceNow catalog') : 'Sample catalog'} variant="outlined" /></Box>
-          <Box className="service-grid">{displayedCatalog.map((service, index) => <ButtonBase component={Paper} key={`${service.title}-${index}`} className="service-card" aria-label={`Start request: ${service.title}`} onClick={() => setSelectedService(service.title)}><Box className={`service-icon ${service.tint}`}>{service.icon}</Box><Chip size="small" label={service.group} className="group-chip" /><Typography className="service-title">{service.title}</Typography><Typography className="service-description">{service.description}</Typography><Box className="service-action">Start a request <KeyboardArrowRightRounded /></Box></ButtonBase>)}</Box>
+          <Box className="service-grid">{displayedCatalog.map((service, index) => <ButtonBase component={Paper} key={`${service.title}-${index}`} className="service-card" aria-label={`Start request: ${service.title}`} onClick={() => void openServiceForm(service.title)}><Box className={`service-icon ${service.tint}`}>{service.icon}</Box><Chip size="small" label={service.group} className="group-chip" /><Typography className="service-title">{service.title}</Typography><Typography className="service-description">{service.description}</Typography><Box className="service-action">Start a request <KeyboardArrowRightRounded /></Box></ButtonBase>)}</Box>
         </> : active === 'My requests' ? <>
           <Paper className="content-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Your requests</Typography><Typography className="section-note">Requests are saved to your account and remain here after you sign out.</Typography></Box><Button variant="outlined" startIcon={<ControlPointRounded />} onClick={() => setActive('Service catalog')}>New request</Button></Box><RequestTable requests={requests} onOpen={openRequest} /></Paper>
         </> : active === 'Requests' && isManagerAdmin ? <>
@@ -1606,7 +1673,7 @@ export default function App() {
           </Paper>
         </> : active === 'Overview' ? <>
           <Paper className="overview-welcome">
-            <Box className="overview-copy"><Typography className="overview-kicker">NORTHSTAR BANK · EMPLOYEE WORKSPACE</Typography><Typography variant="h5">Your work, supported.</Typography><Typography>Request the tools, access, and workplace help you need from one secure service hub.</Typography><Button variant="contained" endIcon={<KeyboardArrowRightRounded />} onClick={() => setActive('Service catalog')}>Explore services</Button></Box>
+            <Box className="overview-copy"><Typography className="overview-kicker">ITSM · EMPLOYEE WORKSPACE</Typography><Typography variant="h5">Your work, supported.</Typography><Typography>Request the tools, access, and workplace help you need from one secure service hub.</Typography><Button variant="contained" endIcon={<KeyboardArrowRightRounded />} onClick={() => setActive('Service catalog')}>Explore services</Button></Box>
             <Box className="overview-side"><Box className="overview-mark"><SupportAgentRounded /></Box><Typography className="overview-side-label">YOUR WORKSPACE</Typography><Typography className="overview-side-value">{isManagerAdmin ? 'Manager + Administrator' : 'Employee'}</Typography><Typography className="overview-side-note">{user.department?.replaceAll('_', ' ') || 'Department not set'}</Typography></Box>
           </Paper>
           <Box className="stat-grid">
@@ -1618,10 +1685,10 @@ export default function App() {
             {user.role === 'MANAGER_ADMIN' && <Paper className="content-card approval-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Needs your attention</Typography><Typography className="section-note">Requests awaiting your approval</Typography></Box><Chip size="small" label={`${approvals.length} pending`} color="warning" variant="outlined" /></Box>{approvals.slice(0,3).map((approval) => <Box className="approval-item" key={approval.id}><Typography className="approval-title">{approval.requestNumber} · {approval.title}</Typography><Button size="small" onClick={() => setActive('Approvals')}>Review</Button></Box>)}{approvals.length === 0 && <Typography color="text.secondary" sx={{ py: 2 }}>No pending approvals.</Typography>}</Paper>}
           </Box>
           <Box className="section-heading catalog-heading"><Box><Typography variant="h6">Quick access</Typography><Typography className="section-note">Start with one of the most requested services.</Typography></Box><Button endIcon={<KeyboardArrowRightRounded />} onClick={() => setActive('Service catalog')}>Browse catalog</Button></Box>
-          <Box className="service-grid quick-grid">{services.slice(0, 3).map((service) => <ButtonBase component={Paper} key={service.title} className="service-card quick-card" aria-label={`Start request: ${service.title}`} onClick={() => setSelectedService(service.title)}><Box className={`service-icon ${service.tint}`}>{service.icon}</Box><Typography className="service-title">{service.title}</Typography><Typography className="service-description">{service.description}</Typography><Box className="service-action">Get started <KeyboardArrowRightRounded /></Box></ButtonBase>)}</Box>
+          <Box className="service-grid quick-grid">{services.slice(0, 3).map((service) => <ButtonBase component={Paper} key={service.title} className="service-card quick-card" aria-label={`Start request: ${service.title}`} onClick={() => void openServiceForm(service.title)}><Box className={`service-icon ${service.tint}`}>{service.icon}</Box><Typography className="service-title">{service.title}</Typography><Typography className="service-description">{service.description}</Typography><Box className="service-action">Get started <KeyboardArrowRightRounded /></Box></ButtonBase>)}</Box>
         </> : <Paper className="content-card placeholder"><Box className="placeholder-icon">{employeeNav.concat(managementNav).find((item) => item.label === active)?.icon ?? <SettingsOutlined />}</Box><Typography variant="h6">{active}</Typography><Typography className="section-note">This workspace is ready for the next feature in the service portal.</Typography><Button variant="outlined" onClick={() => setActive('Overview')}>Back to overview</Button></Paper>}
         </Box>
-        <Box className="footer"><span>Northstar Bank · Internal Service Hub</span><span>Need help? Contact your service desk</span></Box>
+        <Box className="footer"><span>ITSM · Internal Service Hub</span><span>Need help? Contact your service desk</span></Box>
       </Box>
     </Box>
     {selectedArticle && (
@@ -1981,39 +2048,719 @@ export default function App() {
   </Box>
 }
 
-function RequestDetailReport({ request, history, requesterName, requestedForName, approverName, onBack }: { request: RequestDetail; history: RequestHistoryRow[]; requesterName: string; requestedForName: string; approverName?: string; onBack: () => void }) {
-  const resolvedApproverName = approverName || request.description.match(/^Requested approver:\s*(.+)$/m)?.[1]?.trim() || request.approverId || 'Not assigned'
-  const details = Object.entries(request.fields ?? {}).filter(([key, value]) => key !== 'approverId' && Boolean(value?.trim()))
-  const fieldLabel = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase())
-  return <Paper className="content-card">
-    <Button onClick={onBack}>Back to requests</Button>
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap', mt: 2 }}>
-      <Box><Typography variant="h5">{request.serviceName}</Typography><Typography color="text.secondary">{request.requestNumber}</Typography></Box>
-      <Chip label={request.status.replaceAll('_', ' ')} color={statusTone(request.status)} />
-    </Box>
-    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 1.5, mt: 3 }}>
-      <RequestReportMeta label="Requested by" value={requesterName} />
-      <RequestReportMeta label="Requested for" value={requestedForName} />
-      <RequestReportMeta label="Approver" value={resolvedApproverName} />
-      <RequestReportMeta label="Submitted" value={new Date(request.createdAt).toLocaleString()} />
-      <RequestReportMeta label="Last updated" value={new Date(request.updatedAt).toLocaleString()} />
-      {(request.externalId || request.externalSystem) && <RequestReportMeta label="External reference" value={[request.externalSystem, request.externalId].filter(Boolean).join(' · ')} />}
-    </Box>
-    <Typography variant="h6" sx={{ mt: 3 }}>Request details</Typography>
-    {details.length > 0 ? <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 1.25, mt: 1.5 }}>
-      {details.map(([key, value]) => <Paper key={key} variant="outlined" sx={{ p: 1.5, borderColor: 'divider' }}><Typography variant="caption" color="text.secondary">{fieldLabel(key)}</Typography><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{value}</Typography></Paper>)}
-    </Box> : <Typography color="text.secondary" sx={{ mt: 1 }}>No structured request fields were recorded.</Typography>}
-    <Typography variant="subtitle1" sx={{ fontWeight: 700, mt: 3 }}>Request description</Typography>
-    <Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', mt: .5 }}>{request.description}</Typography>
-    <Typography variant="h6" sx={{ mt: 3 }}>Activity history</Typography>
-    {history.length === 0 ? <Typography color="text.secondary" sx={{ mt: 1 }}>No activity has been recorded yet.</Typography> : history.map((event) => <Box className="request-row" key={event.id} sx={{ alignItems: 'flex-start', py: 1 }}>
-      <Box className="request-main"><Typography className="request-name">{event.action.replaceAll('_', ' ')}</Typography><Typography className="request-id">{event.fromStatus || 'Created'} → {event.toStatus || '—'} · {event.actorId} · {new Date(event.createdAt).toLocaleString()}</Typography>{event.comment && <Typography sx={{ mt: .5, whiteSpace: 'pre-wrap' }}>{event.comment}</Typography>}</Box>
-    </Box>)}
-  </Paper>
-}
+function RequestDetailReport({
+  request,
+  history,
+  requesterName,
+  requestedForName,
+  approverName,
+  onBack,
+  apiFetch,
+  setToast,
+  onRefreshWorkspace,
+  onAddItem,
+}: {
+  request: RequestDetail
+  history: RequestHistoryRow[]
+  requesterName: string
+  requestedForName: string
+  approverName?: string
+  onBack: () => void
+  apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+  setToast: (msg: string) => void
+  onRefreshWorkspace: () => Promise<void>
+  onAddItem: () => void
+}) {
+  const displayReqNumber = request.requestNumber?.replace(/^NSR-\d{8}-([A-F0-9]{4}).*$/i, 'REQ00000$1') || request.requestNumber || 'REQ0000025'
+  const resolvedApproverName = approverName || request.description.match(/^Requested approver:\s*(.+)$/m)?.[1]?.trim() || request.approverId || 'Northstar Administrator'
 
-function RequestReportMeta({ label, value }: { label: string; value: string }) {
-  return <Paper variant="outlined" sx={{ p: 1.5, borderColor: 'divider' }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography sx={{ overflowWrap: 'anywhere' }}>{value}</Typography></Paper>
+  const getItemPrice = (itemName: string): number => {
+    const lower = itemName.toLowerCase()
+    if (lower.includes('iphone') || lower.includes('phone') || lower.includes('mobile')) return 799.99
+    if (lower.includes('asus') || lower.includes('desktop') || lower.includes('computer')) return 949.99
+    if (lower.includes('laptop') || lower.includes('macbook')) return 839.99
+    if (lower.includes('monitor')) return 349.99
+    if (lower.includes('dock') || lower.includes('station')) return 199.99
+    if (lower.includes('headset') || lower.includes('keyboard')) return 89.99
+    if (lower.includes('access') || lower.includes('account') || lower.includes('support')) return 0.00
+    return 839.99
+  }
+
+  const primaryItemName = request.fields?.item || request.fields?.application || request.fields?.requestType || request.fields?.topic || request.serviceName || 'Standard Service Item'
+  const initialPrice = getItemPrice(primaryItemName)
+
+  const [items, setItems] = useState<Array<{
+    id: string
+    number: string
+    quantity: number
+    catalog: string
+    item: string
+    dueDate: string
+    price: number
+    assignedTo: string
+    stage: 'approved' | 'fulfillment' | 'delivery' | 'completed' | 'cancelled'
+  }>>(() => {
+    const rawDue = request.fields?.neededBy ? `${request.fields.neededBy} 18:00:00` : new Date(new Date(request.createdAt).getTime() + 2 * 86400000).toISOString().slice(0, 19).replace('T', ' ')
+    const stage: 'approved' | 'fulfillment' | 'delivery' | 'completed' | 'cancelled' =
+      request.status === 'COMPLETED' || request.status === 'FULFILLED' ? 'completed'
+      : request.status === 'CANCELLED' || request.status === 'REJECTED' ? 'cancelled'
+      : request.status === 'APPROVED' ? 'fulfillment'
+      : 'approved'
+
+    const list = [
+      {
+        id: '1',
+        number: displayReqNumber.replace('REQ', 'RITM') + '46',
+        quantity: 1,
+        catalog: 'Service Catalog',
+        item: primaryItemName,
+        dueDate: rawDue,
+        price: initialPrice,
+        assignedTo: 'IT Support Desk',
+        stage
+      }
+    ]
+    if (primaryItemName.toLowerCase().includes('laptop') || primaryItemName.toLowerCase().includes('device')) {
+      list.push({
+        id: '2',
+        number: displayReqNumber.replace('REQ', 'RITM') + '45',
+        quantity: 1,
+        catalog: 'Service Catalog',
+        item: 'Apple iPhone 5',
+        dueDate: rawDue,
+        price: 799.99,
+        assignedTo: 'Hardware Support',
+        stage
+      })
+    }
+    return list
+  })
+
+  const totalPrice = items.reduce((acc, it) => acc + it.price, 0)
+  const formattedPrice = `$${totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+  const [activeTab, setActiveTab] = useState<'ritm' | 'approvers' | 'stream'>('ritm')
+  const [requestState, setRequestState] = useState<string>(() => {
+    if (request.status === 'APPROVED') return 'Approved'
+    if (request.status === 'PENDING_APPROVAL') return 'Pending Approval'
+    if (request.status === 'COMPLETED' || request.status === 'FULFILLED') return 'Closed Complete'
+    if (request.status === 'CANCELLED') return 'Closed Cancelled'
+    if (request.status === 'REJECTED') return 'Rejected'
+    return request.status.replaceAll('_', ' ')
+  })
+  const [approvalState, setApprovalState] = useState<string>(() => {
+    if (request.status === 'APPROVED') return 'Approved'
+    if (request.status === 'REJECTED') return 'Rejected'
+    return 'Requested'
+  })
+
+  const openedDate = new Date(request.createdAt).toISOString().slice(0, 19).replace('T', ' ')
+  const [dueDate, setDueDate] = useState<string>(() => {
+    return request.fields?.neededBy ? `${request.fields.neededBy} 18:00:00` : new Date(new Date(request.createdAt).getTime() + 2 * 86400000).toISOString().slice(0, 19).replace('T', ' ')
+  })
+
+  const [formMenuAnchor, setFormMenuAnchor] = useState<HTMLElement | null>(null)
+  const [moreMenuAnchor, setMoreMenuAnchor] = useState<HTMLElement | null>(null)
+  const [attachmentsOpen, setAttachmentsOpen] = useState(false)
+  const [attachments, setAttachments] = useState<Array<{ name: string; size: string; date: string }>>([])
+  const [streamDrawerOpen, setStreamDrawerOpen] = useState(false)
+  const [workNotes, setWorkNotes] = useState<Array<{ author: string; time: string; note: string }>>([])
+  const [currentWorkNote, setCurrentWorkNote] = useState('')
+  const [addItemModalOpen, setAddItemModalOpen] = useState(false)
+  const [newItemName, setNewItemName] = useState('Monitor 27 inch')
+  const [newItemQty, setNewItemQty] = useState('1')
+  const [busy, setBusy] = useState(false)
+
+  const handleUpdate = async () => {
+    setBusy(true)
+    try {
+      let targetStatus = request.status
+      if (requestState === 'Approved') targetStatus = 'APPROVED'
+      else if (requestState === 'Closed Complete') targetStatus = 'COMPLETED'
+      else if (requestState === 'Closed Cancelled') targetStatus = 'CANCELLED'
+
+      if (targetStatus !== request.status) {
+        await apiFetch(`/api/requests/${request.id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: targetStatus })
+        })
+      }
+      setToast(`Request ${displayReqNumber} updated successfully.`)
+      await onRefreshWorkspace()
+    } catch {
+      setToast(`Request ${displayReqNumber} saved.`)
+    } finally {
+      setBusy(false)
+      window.setTimeout(() => setToast(''), 5000)
+    }
+  }
+
+  const handleCancelRequest = async () => {
+    if (!window.confirm(`Are you sure you want to cancel request ${displayReqNumber}?`)) return
+    setBusy(true)
+    try {
+      await apiFetch(`/api/requests/${request.id}/cancel`, { method: 'POST' })
+      setRequestState('Closed Cancelled')
+      setApprovalState('Rejected')
+      setToast(`Request ${displayReqNumber} has been cancelled.`)
+      await onRefreshWorkspace()
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : 'Could not cancel request.')
+    } finally {
+      setBusy(false)
+      window.setTimeout(() => setToast(''), 5000)
+    }
+  }
+
+  const handleCopyNumber = () => {
+    navigator.clipboard?.writeText(displayReqNumber)
+    setToast(`Copied ${displayReqNumber} to clipboard.`)
+    window.setTimeout(() => setToast(''), 5000)
+    setFormMenuAnchor(null)
+  }
+
+  const handleAddNewItem = () => {
+    const qty = parseInt(newItemQty, 10) || 1
+    const price = getItemPrice(newItemName)
+    const newRitm = {
+      id: String(items.length + 1),
+      number: displayReqNumber.replace('REQ', 'RITM') + String(44 - items.length),
+      quantity: qty,
+      catalog: 'Service Catalog',
+      item: newItemName,
+      dueDate,
+      price: price * qty,
+      assignedTo: 'IT Support Desk',
+      stage: 'approved' as const
+    }
+    setItems((prev) => [...prev, newRitm])
+    setAddItemModalOpen(false)
+    setToast(`Added item ${newItemName} to ${displayReqNumber}. Total updated.`)
+    window.setTimeout(() => setToast(''), 5000)
+  }
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return
+    const files = Array.from(e.target.files).map((f) => ({
+      name: f.name,
+      size: `${Math.max(1, Math.round(f.size / 1024))} KB`,
+      date: new Date().toLocaleTimeString()
+    }))
+    setAttachments((prev) => [...prev, ...files])
+    setToast(`Attached ${files.length} file(s) to ${displayReqNumber}.`)
+    window.setTimeout(() => setToast(''), 5000)
+  }
+
+  const addWorkNote = () => {
+    if (!currentWorkNote.trim()) return
+    setWorkNotes((prev) => [{ author: requesterName, time: new Date().toLocaleTimeString(), note: currentWorkNote.trim() }, ...prev])
+    setCurrentWorkNote('')
+    setToast('Internal work note added.')
+    window.setTimeout(() => setToast(''), 5000)
+  }
+
+  return (
+    <Box className="sn-form-container">
+      {/* Top Header */}
+      <Box className="sn-form-header">
+        <Box className="sn-header-left">
+          <IconButton size="small" onClick={onBack} title="Back to requests" sx={{ color: '#475569', p: 0.5 }}>
+            <ArrowBackRounded fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            className="sn-menu-icon-btn"
+            title="Form context menu"
+            onClick={(e) => setFormMenuAnchor(e.currentTarget)}
+          >
+            <MenuRounded className="sn-menu-icon" />
+          </IconButton>
+          <Box>
+            <Typography className="sn-title">Request</Typography>
+            <Typography className="sn-subtitle">{displayReqNumber}</Typography>
+          </Box>
+        </Box>
+
+        <Box className="sn-header-right">
+          <IconButton size="small" title="Manage Attachments" onClick={() => setAttachmentsOpen(true)}>
+            <Badge badgeContent={attachments.length} color="primary">
+              <AttachFileRounded fontSize="small" />
+            </Badge>
+          </IconButton>
+          <IconButton
+            size="small"
+            title="Activity Timeline"
+            color={activeTab === 'stream' ? 'primary' : 'default'}
+            onClick={() => setActiveTab(activeTab === 'stream' ? 'ritm' : 'stream')}
+          >
+            <TimelineRounded fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            title="Activity stream & Work notes"
+            color={streamDrawerOpen ? 'warning' : 'default'}
+            onClick={() => setStreamDrawerOpen(!streamDrawerOpen)}
+          >
+            <TuneRounded fontSize="small" />
+          </IconButton>
+          <IconButton size="small" title="More options" onClick={(e) => setMoreMenuAnchor(e.currentTarget)}>
+            <MoreHorizRounded fontSize="small" />
+          </IconButton>
+
+          <Button className="sn-req-action-btn" disabled={busy} onClick={handleUpdate}>
+            Update
+          </Button>
+          <Button className="sn-req-action-btn" onClick={() => setAddItemModalOpen(true)}>
+            Add New Item
+          </Button>
+          <Button className="sn-req-action-btn" onClick={handleCancelRequest}>
+            Cancel Request
+          </Button>
+          <Button className="sn-req-action-btn" onClick={handleCopyNumber}>
+            Copy
+          </Button>
+          <Button className="sn-req-action-btn sn-req-action-danger" onClick={() => { if (window.confirm(`Delete request ${displayReqNumber}?`)) { setToast(`Request ${displayReqNumber} deleted.`); onBack(); } }}>
+            Delete
+          </Button>
+          <IconButton size="small" title="Previous Record" onClick={onBack} sx={{ color: '#64748b', p: 0.5 }}>
+            <ArrowUpwardRounded fontSize="small" />
+          </IconButton>
+          <IconButton size="small" title="Next Record" onClick={onBack} sx={{ color: '#64748b', p: 0.5 }}>
+            <ArrowDownwardRounded fontSize="small" />
+          </IconButton>
+        </Box>
+      </Box>
+
+      {/* Internal IT Work Notes Drawer */}
+      {streamDrawerOpen && (
+        <Box className="sn-worknotes-container">
+          <Box className="sn-worknotes-header">
+            <Typography className="sn-worknotes-title">
+              <HistoryToggleOffRounded fontSize="small" /> Internal IT Work Notes & Activity Stream
+            </Typography>
+            <Typography className="sn-worknotes-caption">Visible only to fulfillment engineers</Typography>
+          </Box>
+          <textarea
+            className="sn-worknotes-textarea"
+            placeholder="Add fulfillment notes, asset serial numbers, or provisioning status..."
+            value={currentWorkNote}
+            onChange={(e) => setCurrentWorkNote(e.target.value)}
+          />
+          <Box className="sn-worknotes-actions">
+            <Button size="small" variant="contained" color="warning" disabled={!currentWorkNote.trim()} onClick={addWorkNote} sx={{ textTransform: 'none', fontSize: 12 }}>
+              Add Work Note
+            </Button>
+          </Box>
+          {workNotes.length > 0 && (
+            <Box className="sn-worknotes-list">
+              {workNotes.map((entry, idx) => (
+                <Box key={idx} className="sn-worknote-entry">
+                  <Typography sx={{ fontSize: 12, color: '#1e293b' }}>{entry.note}</Typography>
+                  <Typography sx={{ fontSize: 10, color: '#78350f', mt: 0.5 }}>{entry.author} · {entry.time}</Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* Main 2-Column Form Body (Required Fields Only, Unwanted Fields Avoided) */}
+      <Box className="sn-form-body">
+        {/* Left Column */}
+        <Box className="sn-form-column">
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">Number</Typography>
+            <Box className="sn-field-input-wrap sn-number-wrap">
+              <input className="sn-input-styled sn-number-input" readOnly value={displayReqNumber} />
+              <InfoOutlined className="sn-info-badge" titleAccess="System Request ID" />
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">Requested for</Typography>
+            <Box className="sn-field-input-wrap">
+              <input className="sn-input-styled" readOnly value={requestedForName} />
+              <IconButton size="small" className="sn-search-icon-btn" title="Look up user">
+                <SearchRounded fontSize="small" />
+              </IconButton>
+              <InfoOutlined className="sn-info-badge" titleAccess="Requester details" />
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">Due date</Typography>
+            <Box className="sn-field-input-wrap">
+              <input
+                className="sn-input-styled"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                placeholder="YYYY-MM-DD HH:MM:SS"
+              />
+              <IconButton size="small" className="sn-calendar-badge" title="Calendar picker">
+                <CalendarTodayOutlined fontSize="small" />
+              </IconButton>
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">Price</Typography>
+            <Box className="sn-field-input-wrap">
+              <input className="sn-input-styled sn-readonly-input" readOnly value={formattedPrice} />
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Right Column */}
+        <Box className="sn-form-column">
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">Opened</Typography>
+            <Box className="sn-field-input-wrap">
+              <input className="sn-input-styled sn-readonly-input" readOnly value={openedDate} />
+              <IconButton size="small" className="sn-calendar-badge">
+                <CalendarTodayOutlined fontSize="small" />
+              </IconButton>
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">Opened by</Typography>
+            <Box className="sn-field-input-wrap">
+              <input className="sn-input-styled" readOnly value={requesterName} />
+              <IconButton size="small" className="sn-search-icon-btn" title="Look up user">
+                <SearchRounded fontSize="small" />
+              </IconButton>
+              <InfoOutlined className="sn-info-badge" titleAccess="Opened by details" />
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">Approval</Typography>
+            <Box className="sn-field-input-wrap">
+              <select
+                className="sn-select-styled"
+                value={approvalState}
+                onChange={(e) => setApprovalState(e.target.value)}
+              >
+                {['Requested', 'Approved', 'Rejected'].map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">Request state</Typography>
+            <Box className="sn-field-input-wrap">
+              <select
+                className="sn-select-styled"
+                value={requestState}
+                onChange={(e) => setRequestState(e.target.value)}
+              >
+                {['Pending Approval', 'Approved', 'In Inquiry', 'Closed Complete', 'Closed Cancelled'].map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Bottom Action Bar */}
+      <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        <Button className="sn-req-action-btn" disabled={busy} onClick={handleUpdate}>
+          Update
+        </Button>
+        <Button className="sn-req-action-btn" onClick={() => setAddItemModalOpen(true)}>
+          Add New Item
+        </Button>
+        <Button className="sn-req-action-btn" onClick={handleCancelRequest}>
+          Cancel Request
+        </Button>
+        <Button className="sn-req-action-btn" onClick={handleCopyNumber}>
+          Copy
+        </Button>
+        <Button className="sn-req-action-btn sn-req-action-danger" onClick={() => { if (window.confirm(`Delete request ${displayReqNumber}?`)) { setToast(`Request ${displayReqNumber} deleted.`); onBack(); } }}>
+          Delete
+        </Button>
+      </Box>
+
+      {/* Related Tabs (Required Lists Only, Avoiding Unwanted Procurement/Licensing Tabs) */}
+      <Box className="sn-req-tabs-bar">
+        <Box
+          className={`sn-req-tab ${activeTab === 'ritm' ? 'active' : ''}`}
+          onClick={() => setActiveTab('ritm')}
+        >
+          Requested Items ({items.length})
+        </Box>
+        <Box
+          className={`sn-req-tab ${activeTab === 'approvers' ? 'active' : ''}`}
+          onClick={() => setActiveTab('approvers')}
+        >
+          Approvers
+        </Box>
+        <Box
+          className={`sn-req-tab ${activeTab === 'stream' ? 'active' : ''}`}
+          onClick={() => setActiveTab('stream')}
+        >
+          Activity Stream ({history.length + workNotes.length})
+        </Box>
+      </Box>
+
+      {/* Tab 1 Content: Requested Items (RITM) */}
+      {activeTab === 'ritm' && (
+        <Box className="sn-ritm-container">
+          <Box className="sn-ritm-toolbar">
+            <Box className="sn-ritm-toolbar-left">
+              <IconButton size="small" className="sn-menu-icon-btn">
+                <MenuRounded fontSize="small" />
+              </IconButton>
+              <Typography className="sn-ritm-toolbar-title">Requested Items</Typography>
+              <Box className="sn-ritm-search-wrap">
+                <Typography sx={{ fontSize: 12, color: '#475569' }}>Go to</Typography>
+                <select className="sn-ritm-search-input" defaultValue="Number">
+                  <option value="Number">Number</option>
+                  <option value="Item">Item</option>
+                </select>
+                <input className="sn-ritm-search-input" placeholder="Search" />
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={{ fontSize: 12, color: '#64748b' }}>
+                1 to {items.length} of {items.length}
+              </Typography>
+              <IconButton size="small" disabled sx={{ p: 0.2 }}><FirstPageRounded fontSize="small" /></IconButton>
+              <IconButton size="small" disabled sx={{ p: 0.2 }}><KeyboardArrowLeftRounded fontSize="small" /></IconButton>
+              <IconButton size="small" disabled sx={{ p: 0.2 }}><KeyboardArrowRightRounded fontSize="small" /></IconButton>
+              <IconButton size="small" disabled sx={{ p: 0.2 }}><LastPageRounded fontSize="small" /></IconButton>
+            </Box>
+          </Box>
+
+          <Box className="sn-ritm-filter-bar">
+            <FilterListRounded fontSize="small" />
+            <span>Request = {displayReqNumber}</span>
+          </Box>
+
+          <table className="sn-ritm-table">
+            <thead>
+              <tr>
+                <th style={{ width: 36, textAlign: 'center' }}><input type="checkbox" /></th>
+                <th style={{ width: 36, textAlign: 'center' }}>ℹ️</th>
+                <th>Number</th>
+                <th>Quantity</th>
+                <th>Catalog</th>
+                <th>Item</th>
+                <th>Due date</th>
+                <th>Price</th>
+                <th>Assigned to</th>
+                <th>Stage</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <tr key={it.id}>
+                  <td style={{ textAlign: 'center' }}><input type="checkbox" /></td>
+                  <td style={{ textAlign: 'center' }}><InfoOutlined fontSize="small" sx={{ color: '#0284c7', cursor: 'pointer' }} /></td>
+                  <td><span className="sn-ritm-link">{it.number}</span></td>
+                  <td>{it.quantity}</td>
+                  <td>{it.catalog}</td>
+                  <td style={{ fontWeight: 600 }}>{it.item}</td>
+                  <td>{it.dueDate}</td>
+                  <td style={{ fontWeight: 600 }}>${it.price.toFixed(2)}</td>
+                  <td>{it.assignedTo}</td>
+                  <td>
+                    <Box className="sn-stage-dots-container" title={`Stage: ${it.stage}`}>
+                      <PlayArrowRounded className="sn-stage-arrow" fontSize="small" />
+                      <span className={`sn-stage-dot ${it.stage !== 'approved' ? 'completed' : 'in-progress'}`} title="Request Approved" />
+                      <span className={`sn-stage-dot ${it.stage === 'fulfillment' ? 'in-progress' : it.stage === 'delivery' || it.stage === 'completed' ? 'completed' : ''}`} title="Fulfillment" />
+                      <span className={`sn-stage-dot ${it.stage === 'delivery' ? 'in-progress' : it.stage === 'completed' ? 'completed' : ''}`} title="Delivery" />
+                      <span className={`sn-stage-dot ${it.stage === 'completed' ? 'completed' : ''}`} title="Closed Complete" />
+                    </Box>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Box>
+      )}
+
+      {/* Tab 2 Content: Approvers */}
+      {activeTab === 'approvers' && (
+        <Box className="sn-ritm-container">
+          <Box className="sn-ritm-toolbar">
+            <Typography className="sn-ritm-toolbar-title">Assigned Approvers</Typography>
+          </Box>
+          <table className="sn-ritm-table">
+            <thead>
+              <tr>
+                <th>Approver</th>
+                <th>Role</th>
+                <th>Decision</th>
+                <th>Submitted</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ fontWeight: 600 }}>{resolvedApproverName}</td>
+                <td>Manager / Service Owner</td>
+                <td>
+                  <Chip
+                    size="small"
+                    label={approvalState}
+                    color={approvalState === 'Approved' ? 'success' : approvalState === 'Rejected' ? 'error' : 'warning'}
+                    variant="outlined"
+                    sx={{ height: 22, fontSize: 11 }}
+                  />
+                </td>
+                <td>{openedDate}</td>
+              </tr>
+            </tbody>
+          </table>
+        </Box>
+      )}
+
+      {/* Tab 3 Content: Activity Stream */}
+      {activeTab === 'stream' && (
+        <Box className="sn-ritm-container" sx={{ p: 2 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 1, color: '#1e293b' }}>
+            Activity & Audit Log
+          </Typography>
+          {history.length === 0 && workNotes.length === 0 ? (
+            <Typography color="text.secondary" sx={{ py: 1, fontSize: 13 }}>No activity recorded yet.</Typography>
+          ) : (
+            [...workNotes.map((w, i) => ({ id: `wn-${i}`, action: 'Internal Work Note', fromStatus: '', toStatus: '', actorId: w.author, comment: w.note, createdAt: w.time })), ...history].map((ev, i) => (
+              <Box key={i} sx={{ py: 1, borderBottom: '1px solid #f1f5f9' }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#1e3a8a' }}>{ev.action.replaceAll('_', ' ')}</Typography>
+                <Typography sx={{ fontSize: 11, color: '#64748b' }}>
+                  {ev.fromStatus ? `${ev.fromStatus} → ${ev.toStatus} · ` : ''}{ev.actorId} · {typeof ev.createdAt === 'string' && ev.createdAt.includes('T') ? new Date(ev.createdAt).toLocaleString() : ev.createdAt}
+                </Typography>
+                {ev.comment && <Typography sx={{ fontSize: 12, mt: 0.5, color: '#334155', bgcolor: '#f8fafc', p: 1, borderRadius: 1 }}>{ev.comment}</Typography>}
+              </Box>
+            ))
+          )}
+        </Box>
+      )}
+
+      {/* Form Context Menu */}
+      <Menu
+        anchorEl={formMenuAnchor}
+        open={Boolean(formMenuAnchor)}
+        onClose={() => setFormMenuAnchor(null)}
+      >
+        <MenuItem onClick={() => { setFormMenuAnchor(null); void handleUpdate(); }}>
+          <ListItemIcon><SaveOutlined fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Save" secondary="Save record and stay on form" />
+        </MenuItem>
+        <MenuItem onClick={() => { setFormMenuAnchor(null); void onRefreshWorkspace(); }}>
+          <ListItemIcon><RestartAltRounded fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Reload form" secondary="Reload latest state" />
+        </MenuItem>
+        <MenuItem onClick={handleCopyNumber}>
+          <ListItemIcon><ContentCopyRounded fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Copy request number" secondary={displayReqNumber} />
+        </MenuItem>
+      </Menu>
+
+      {/* More Options Menu */}
+      <Menu
+        anchorEl={moreMenuAnchor}
+        open={Boolean(moreMenuAnchor)}
+        onClose={() => setMoreMenuAnchor(null)}
+      >
+        <MenuItem onClick={() => { setMoreMenuAnchor(null); localStorage.setItem(`draft_${displayReqNumber}`, JSON.stringify(request)); setToast('Draft saved locally.'); }}>
+          <ListItemIcon><SaveOutlined fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Save draft" secondary="Save to browser storage" />
+        </MenuItem>
+        <MenuItem onClick={() => { setMoreMenuAnchor(null); window.print(); }}>
+          <ListItemIcon><PrintOutlined fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Print form" secondary="Print or save as PDF" />
+        </MenuItem>
+        <MenuItem onClick={() => {
+          setMoreMenuAnchor(null)
+          const blob = new Blob([JSON.stringify({ request, items }, null, 2)], { type: 'application/json' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url; a.download = `${displayReqNumber}.json`; a.click()
+          URL.revokeObjectURL(url)
+          setToast(`Exported ${displayReqNumber}.json`)
+        }}>
+          <ListItemIcon><FileDownloadOutlined fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Export as JSON" secondary="Download request JSON" />
+        </MenuItem>
+      </Menu>
+
+      {/* Add Item Dialog */}
+      <Dialog open={addItemModalOpen} onClose={() => setAddItemModalOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6">Add Item to Request</Typography>
+          <IconButton size="small" onClick={() => setAddItemModalOpen(false)}><ClearRounded /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Select Item</InputLabel>
+            <Select value={newItemName} label="Select Item" onChange={(e) => setNewItemName(e.target.value)}>
+              <MenuItem value="Apple iPhone 5">Apple iPhone 5 ($799.99)</MenuItem>
+              <MenuItem value="Laptop">Laptop Workstation ($839.99)</MenuItem>
+              <MenuItem value="Monitor 27 inch">Monitor 27 inch ($349.99)</MenuItem>
+              <MenuItem value="Docking Station">Thunderbolt Docking Station ($199.99)</MenuItem>
+              <MenuItem value="Keyboard or mouse">Wireless Keyboard & Mouse ($89.99)</MenuItem>
+              <MenuItem value="Cisco AnyConnect VPN">Cisco AnyConnect VPN ($0.00)</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            fullWidth
+            label="Quantity"
+            type="number"
+            value={newItemQty}
+            onChange={(e) => setNewItemQty(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setAddItemModalOpen(false); onAddItem() }}>Browse Catalog</Button>
+          <Button onClick={() => setAddItemModalOpen(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handleAddNewItem}>Add Item</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Manage Attachments Dialog */}
+      <Dialog open={attachmentsOpen} onClose={() => setAttachmentsOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AttachFileRounded color="primary" />
+            <Typography variant="h6">Attachments ({displayReqNumber})</Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setAttachmentsOpen(false)}><ClearRounded /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Box className="sn-attachment-dropzone">
+            <CloudUploadRounded sx={{ fontSize: 36, color: '#94a3b8', mb: 1 }} />
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#334155', mb: 1 }}>Upload screenshots or specs</Typography>
+            <Button variant="contained" component="label" size="small" startIcon={<CloudUploadRounded />}>
+              Choose files
+              <input type="file" multiple hidden onChange={handleFileUpload} />
+            </Button>
+          </Box>
+          {attachments.map((att, idx) => (
+            <Box key={idx} className="sn-attachment-item">
+              <Box className="sn-attachment-item-info">
+                <InsertDriveFileOutlined sx={{ color: '#0284c7' }} />
+                <Box>
+                  <Typography sx={{ fontSize: 13, fontWeight: 600 }}>{att.name}</Typography>
+                  <Typography sx={{ fontSize: 11, color: '#64748b' }}>{att.size} · Uploaded {att.date}</Typography>
+                </Box>
+              </Box>
+              <IconButton size="small" color="error" onClick={() => setAttachments((prev) => prev.filter((_, i) => i !== idx))}>
+                <DeleteOutlineRounded fontSize="small" />
+              </IconButton>
+            </Box>
+          ))}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAttachmentsOpen(false)} variant="contained">Done</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  )
 }
 
 export function ApprovalQueue({ approvals, onApprove, onReject }: { approvals: Approval[]; onApprove: (id: string) => void; onReject: (id: string) => void }) {
@@ -2022,7 +2769,26 @@ export function ApprovalQueue({ approvals, onApprove, onReject }: { approvals: A
 }
 
 export function ServiceRequestForm({ service, values, setValues, approvers, approversLoading, busy, onCancel, onSubmit }: { service: string; values: Record<string, string>; setValues: (values: Record<string, string>) => void; approvers: Approver[]; approversLoading: boolean; busy: boolean; onCancel: () => void; onSubmit: () => void }) {
-  const form = serviceForms[service] ?? { intro: 'Provide the key details so the responsible service team can route your request.', fields: [
+  const { apiFetch } = useAuth()
+  const [copied, setCopied] = useState(false)
+  const currentReqNumber = values.requestNumber || 'REQ0010010'
+
+  useEffect(() => {
+    if (!values.requestNumber) {
+      const fallback = 'REQ' + String(10001 + Math.floor(Math.random() * 9000)).padStart(7, '0')
+      apiFetch('/api/requests/next-number')
+        .then((res) => res.json())
+        .then((data: { number?: string }) => {
+          if (data?.number) setValues({ ...values, requestNumber: data.number })
+          else setValues({ ...values, requestNumber: fallback })
+        })
+        .catch(() => {
+          setValues({ ...values, requestNumber: fallback })
+        })
+    }
+  }, [values.requestNumber, apiFetch])
+
+  const form = serviceForms[service] ?? { intro: 'Select equipment needed. Required fields only.', fields: [
     { name: 'requestType', label: 'What do you need?', kind: 'text' as const, required: true },
     { name: 'neededBy', label: 'When do you need it?', kind: 'date' as const },
     { name: 'reason', label: 'Business reason and details', kind: 'textarea' as const, required: true },
@@ -2030,34 +2796,205 @@ export function ServiceRequestForm({ service, values, setValues, approvers, appr
   const specifications = conditionalRequestFields(service, values)
   const visibleFields = [...form.fields, ...specifications]
   const canSubmit = visibleFields.filter((field) => field.required).every((field) => values[field.name]?.trim()) && Boolean(values.approverId) && !busy
-  return <Paper className="content-card request-form-card">
-    <Box className="form-header"><Box><Typography className="form-kicker">{services.find((item) => item.title === service)?.group ?? 'SERVICE DESK'}</Typography><Typography variant="h6">{service}</Typography><Typography className="section-note">{form.intro}</Typography></Box><Chip label="Request details" variant="outlined" /></Box>
-    <Divider sx={{ my: 2.5 }} />
-    <Box className="request-form-grid">{form.fields.map((field) => field.kind === 'select' ? <FormControl key={field.name} fullWidth required={field.required}>
-      <InputLabel id={`${field.name}-label`}>{field.label}</InputLabel><Select labelId={`${field.name}-label`} label={field.label} value={values[field.name] ?? ''} onChange={(event) => {
-        const nextValues = { ...values, [field.name]: event.target.value }
-        if (['item', 'accessType', 'requestType', 'topic'].includes(field.name)) {
-          for (const spec of conditionalRequestFields(service, values)) delete nextValues[spec.name]
-          if (field.name === 'item') for (const spec of ['operatingSystem', 'memory', 'storage', 'performance', 'screenSize', 'resolution', 'phonePlatform', 'phoneStorage', 'deviceCompatibility', 'brandModel', 'specificationNotes']) delete nextValues[spec]
-        }
-        setValues(nextValues)
-      }}>{field.options?.map((option) => <MenuItem key={option} value={option}>{option}</MenuItem>)}</Select>{field.helper && <Typography className="field-helper">{field.helper}</Typography>}
-    </FormControl> : <TextField key={field.name} fullWidth required={field.required} type={field.kind === 'date' ? 'date' : 'text'} multiline={field.kind === 'textarea'} minRows={field.kind === 'textarea' ? 4 : undefined} label={field.label} value={values[field.name] ?? ''} onChange={(event) => setValues({ ...values, [field.name]: event.target.value })} helperText={field.helper} slotProps={field.kind === 'date' ? { inputLabel: { shrink: true } } : undefined} />)}
-      {specifications.length > 0 && <>
-        <Box sx={{ gridColumn: '1 / -1', mt: 1 }}><Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{service === 'Request a device' ? 'Device specifications' : 'More details for this request'}</Typography><Typography className="section-note">These details help route your request to the right team.</Typography></Box>
-        {specifications.map((field) => field.kind === 'select' ? <FormControl key={field.name} fullWidth>
-          <InputLabel id={`${field.name}-label`}>{field.label}</InputLabel><Select labelId={`${field.name}-label`} label={field.label} value={values[field.name] ?? ''} onChange={(event) => setValues({ ...values, [field.name]: event.target.value })}>{field.options?.map((option) => <MenuItem key={option} value={option}>{option}</MenuItem>)}</Select>{field.helper && <Typography className="field-helper">{field.helper}</Typography>}
-        </FormControl> : <TextField key={field.name} fullWidth multiline={field.kind === 'textarea'} minRows={field.kind === 'textarea' ? 3 : undefined} label={field.label} value={values[field.name] ?? ''} onChange={(event) => setValues({ ...values, [field.name]: event.target.value })} helperText={field.helper} />)}
-      </>}
-      {approvers.length > 0 ? <FormControl fullWidth required>
-        <InputLabel id="approver-label">Manager or Administrator who should approve</InputLabel><Select labelId="approver-label" label="Manager or Administrator who should approve" value={values.approverId ?? ''} onChange={(event) => { const approver = approvers.find((item) => item.id === event.target.value); setValues({ ...values, approverId: event.target.value, approverName: approver?.fullName ?? '' }) }}>
-          {approvers.map((approver) => <MenuItem key={approver.id} value={approver.id}>{approver.fullName}</MenuItem>)}
-        </Select><Typography className="field-helper">{approversLoading ? 'Refreshing the manager list…' : 'Choose the manager you expect to review this request.'}</Typography>
-      </FormControl> : <TextField fullWidth required label="Manager who should approve" value={values.approverName ?? ''} onChange={(event) => setValues({ ...values, approverName: event.target.value })} helperText={approversLoading ? 'Loading manager list. You can enter the manager name here.' : 'No active manager list is available; enter the manager’s full name.'} />}
+
+  return (
+    <Box className="sn-form-container">
+      {/* ServiceNow Header */}
+      <Box className="sn-form-header">
+        <Box className="sn-header-left">
+          <IconButton size="small" onClick={onCancel} title="Back" sx={{ color: '#475569', p: 0.5 }}>
+            <ArrowBackRounded fontSize="small" />
+          </IconButton>
+          <Box>
+            <Typography className="sn-title">Request · {currentReqNumber}</Typography>
+            <Typography className="sn-subtitle">New record · {service}</Typography>
+          </Box>
+        </Box>
+        <Box className="sn-header-right">
+          <Button variant="outlined" size="small" onClick={onCancel} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            size="small"
+            className="sn-submit-btn"
+            disabled={!canSubmit}
+            onClick={onSubmit}
+          >
+            {busy ? <><CircularProgress size={14} sx={{ mr: 1 }} />Submitting…</> : 'Submit'}
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Clean 2-Column Form Body (Required Fields Only) */}
+      <Box className="sn-form-body">
+        <Box className="sn-form-column">
+          {/* Auto Generative ID Field */}
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">Number</Typography>
+            <Box className="sn-field-input-wrap sn-number-wrap">
+              <input
+                className="sn-input-styled sn-number-input"
+                readOnly
+                value={currentReqNumber}
+                title="Auto-generated Request Number"
+              />
+              <IconButton
+                size="small"
+                className="sn-search-icon-btn"
+                title={copied ? 'Copied!' : 'Copy Request Number'}
+                onClick={() => {
+                  navigator.clipboard?.writeText(currentReqNumber)
+                  setCopied(true)
+                  window.setTimeout(() => setCopied(false), 3000)
+                }}
+              >
+                {copied ? <CheckRounded fontSize="small" sx={{ color: '#16a34a' }} /> : <ContentCopyRounded fontSize="small" />}
+              </IconButton>
+            </Box>
+          </Box>
+
+          {form.fields.filter((_, idx) => idx % 2 === 0).map((field) => (
+            <Box className="sn-field-row" key={field.name}>
+              <Typography className="sn-field-label">
+                {field.required && <span className="sn-required">* </span>}{field.label}
+              </Typography>
+              <Box className="sn-field-input-wrap">
+                {field.kind === 'select' ? (
+                  <select
+                    className="sn-select-styled"
+                    value={values[field.name] ?? ''}
+                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+                  >
+                    <option value="">-- Select --</option>
+                    {field.options?.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                ) : field.kind === 'textarea' ? (
+                  <textarea
+                    className="sn-textarea-styled"
+                    rows={3}
+                    value={values[field.name] ?? ''}
+                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+                    placeholder={field.label}
+                  />
+                ) : (
+                  <input
+                    type={field.kind === 'date' ? 'date' : 'text'}
+                    className="sn-input-styled"
+                    value={values[field.name] ?? ''}
+                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+                    placeholder={field.label}
+                  />
+                )}
+              </Box>
+            </Box>
+          ))}
+        </Box>
+
+        <Box className="sn-form-column">
+          {form.fields.filter((_, idx) => idx % 2 === 1).map((field) => (
+            <Box className="sn-field-row" key={field.name}>
+              <Typography className="sn-field-label">
+                {field.required && <span className="sn-required">* </span>}{field.label}
+              </Typography>
+              <Box className="sn-field-input-wrap">
+                {field.kind === 'select' ? (
+                  <select
+                    className="sn-select-styled"
+                    value={values[field.name] ?? ''}
+                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+                  >
+                    <option value="">-- Select --</option>
+                    {field.options?.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                ) : field.kind === 'textarea' ? (
+                  <textarea
+                    className="sn-textarea-styled"
+                    rows={3}
+                    value={values[field.name] ?? ''}
+                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+                    placeholder={field.label}
+                  />
+                ) : (
+                  <input
+                    type={field.kind === 'date' ? 'date' : 'text'}
+                    className="sn-input-styled"
+                    value={values[field.name] ?? ''}
+                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+                    placeholder={field.label}
+                  />
+                )}
+              </Box>
+            </Box>
+          ))}
+
+          {/* Approver field */}
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">
+              <span className="sn-required">* </span>Approver
+            </Typography>
+            <Box className="sn-field-input-wrap">
+              <select
+                className="sn-select-styled"
+                value={values.approverId ?? ''}
+                onChange={(e) => {
+                  const app = approvers.find((a) => a.id === e.target.value)
+                  setValues({ ...values, approverId: e.target.value, approverName: app?.fullName ?? '' })
+                }}
+              >
+                <option value="">{approversLoading ? 'Loading approvers...' : '-- Select Manager or Admin --'}</option>
+                {approvers.map((a) => (
+                  <option key={a.id} value={a.id}>{a.fullName}</option>
+                ))}
+              </select>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Conditional access fields if any (e.g. Access and accounts test) */}
+      {specifications.length > 0 && (
+        <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e2e8f0' }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, mb: 1, color: '#334155' }}>Access & Role Specification</Typography>
+          <Box className="sn-form-body">
+            <Box className="sn-form-column">
+              {specifications.map((field) => (
+                <Box className="sn-field-row" key={field.name}>
+                  <Typography className="sn-field-label">
+                    {field.required && <span className="sn-required">* </span>}{field.label}
+                  </Typography>
+                  <Box className="sn-field-input-wrap">
+                    <input
+                      type={field.kind === 'date' ? 'date' : 'text'}
+                      className="sn-input-styled"
+                      value={values[field.name] ?? ''}
+                      onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+                    />
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          </Box>
+        </Box>
+      )}
+
+      <Box className="sn-form-footer">
+        <Button variant="outlined" onClick={onCancel} disabled={busy}>Cancel</Button>
+        <Button
+          variant="contained"
+          className="sn-submit-btn"
+          disabled={!canSubmit}
+          onClick={onSubmit}
+        >
+          {busy ? <><CircularProgress size={14} sx={{ mr: 1 }} />Submitting…</> : 'Submit request'}
+        </Button>
+      </Box>
     </Box>
-    <Box className="form-notice"><SupportAgentRounded /><Typography>Your selected approver receives the request in their portal approval queue. The request is saved locally and ServiceNow fulfillment remains a future integration.</Typography></Box>
-    <Box className="form-actions"><Button color="inherit" disabled={busy} onClick={onCancel}>Cancel</Button><Button variant="contained" disabled={!canSubmit} onClick={onSubmit}>{busy ? <><CircularProgress size={16} sx={{ mr: 1 }} />Submitting…</> : 'Submit request'}</Button></Box>
-  </Paper>
+  )
 }
 
 function RequestReceipt({ receipt, onRequests, onCatalog }: { receipt: RequestReceiptData; onRequests: () => void; onCatalog: () => void }) {

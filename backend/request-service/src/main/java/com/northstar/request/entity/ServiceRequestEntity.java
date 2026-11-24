@@ -85,6 +85,9 @@ public class ServiceRequestEntity {
 
     public UUID getId() { return id; }
     public String getRequestNumber() {
+        if (serviceNowNumber != null && !serviceNowNumber.isBlank()) {
+            return serviceNowNumber;
+        }
         String compactId = id.toString().replace("-", "").substring(0, 8).toUpperCase();
         return "NSR-" + REQUEST_DATE.format(createdAt) + "-" + compactId;
     }
@@ -100,6 +103,7 @@ public class ServiceRequestEntity {
     public RequestStatus getStatus() { return status; }
     public void setStatus(RequestStatus status) { this.status = status; }
     public String getServiceNowNumber() { return serviceNowNumber; }
+    public void setServiceNowNumber(String serviceNowNumber) { this.serviceNowNumber = serviceNowNumber; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }
