@@ -15,7 +15,7 @@ The current repository contains the Eureka Service Registry, API Gateway, Auth S
 
 The Request Service stores optional `external_id` and `external_system` columns for later synchronization. Request/approval/incident writes are behind service interfaces so an adapter can be added later. ServiceNow catalog behavior was left unchanged. MySQL is currently the source of truth for locally created requests, decisions, and incidents. No RITM, SCTASK, Incident, or Approval record is currently created in ServiceNow by submitting through the portal.
 
-The API Gateway is the user-facing backend entry point; Eureka provides discovery. Request Service rejects missing or invalid JWTs even when called directly on port 8083. The Gateway removes caller-provided identity headers, forwards verified identity, and adds a correlation ID. Request Service uses the token subject for employee ownership. The combined Manager + Administrator role sees the general request queue, while People support request records remain scoped to their requester/requested-for/approver participants.
+The API Gateway is the user-facing backend entry point; Eureka provides discovery. Request Service rejects missing or invalid JWTs even when called directly on port 8082. The Gateway removes caller-provided identity headers, forwards verified identity, and adds a correlation ID. Request Service uses the token subject for employee ownership. The combined Manager + Administrator role sees the general request queue, while People support request records remain scoped to their requester/requested-for/approver participants.
 
 ## Current workflow
 

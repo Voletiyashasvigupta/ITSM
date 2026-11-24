@@ -6,6 +6,7 @@ import com.northstar.incident.dto.IncidentStatusInput;
 import com.northstar.incident.service.LocalIncidentService;
 import jakarta.validation.Valid;
 import java.util.Collection;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,6 +27,11 @@ public class IncidentsController {
 
     public IncidentsController(LocalIncidentService incidents) {
         this.incidents = incidents;
+    }
+
+    @GetMapping("/next-number")
+    public Map<String, String> nextNumber() {
+        return Map.of("number", incidents.generateNextNumber());
     }
 
     @PostMapping
@@ -62,4 +68,3 @@ public class IncidentsController {
         return claim instanceof Collection<?> values && values.stream().anyMatch("MANAGER_ADMIN"::equals);
     }
 }
-

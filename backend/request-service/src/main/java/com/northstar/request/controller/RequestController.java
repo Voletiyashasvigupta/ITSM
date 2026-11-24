@@ -42,8 +42,13 @@ public class RequestController {
     @GetMapping("/{id}")
     public RequestDetailsResponse get(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) { return requests.get(id,jwt.getSubject(),isManager(jwt)); }
 
-    @GetMapping("/{id}/history")
+    @GetMapping(value = {"/{id}/timeline", "/{id}/history"})
     public List<RequestHistoryResponse> history(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) { return requests.history(id,jwt.getSubject(),isManager(jwt)); }
+
+    @PostMapping("/{id}/cancel")
+    public RequestDetailsResponse cancel(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return requests.cancel(id, jwt.getSubject(), isManager(jwt));
+    }
 
     @PatchMapping("/{id}/status")
     public RequestDetailsResponse updateStatus(@PathVariable("id") UUID id,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody RequestStatusInput input) {

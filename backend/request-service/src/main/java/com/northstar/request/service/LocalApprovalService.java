@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 public interface LocalApprovalService {
     java.util.List<ApprovalResponse> pending(String actor, boolean manager);
     java.util.List<ApprovalResponse> history(String actor, boolean manager);
+    ApprovalResponse get(UUID id, String actor, boolean manager);
     ApprovalResponse decide(UUID id, String actor, boolean approve, String comment);
 }
 
@@ -28,6 +29,13 @@ class LocalApprovalServiceImpl implements LocalApprovalService {
     LocalApprovalServiceImpl(ApprovalRepository a,ServiceRequestRepository r,RequestHistoryRepository h,RequestStateMachine stateMachine){approvals=a;requests=r;history=h;this.stateMachine=stateMachine;}
     @Override public java.util.List<ApprovalResponse> pending(String actor,boolean manager){return list(actor,manager,true);}
     @Override public java.util.List<ApprovalResponse> history(String actor,boolean manager){return list(actor,manager,false);}
+    @Override public ApprovalResponse get(UUID id, String actor, boolean manager) {
+        ApprovalEntity a = approvals.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Approval not found"));
+        ServiceRequestEntity r = requests.findById(a.getRequestId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found"));
+        boolean participant = a.getApproverId().equals(actor) || r.getRequesterId().equals(actor) || r.getRequestedForId().equals(actor);
+        if (!manager && !participant) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to approval record");
+        return view(a);
+    }
     private java.util.List<ApprovalResponse> list(String actor,boolean manager,boolean pending){
         var rows=pending?approvals.findByApproverIdAndDecisionOrderByCreatedAtDesc(actor,"PENDING"):approvals.findByApproverIdOrderByCreatedAtDesc(actor);
         return rows.stream().filter(a->!pending||a.getDecision().equals("PENDING")).map(this::view).toList();

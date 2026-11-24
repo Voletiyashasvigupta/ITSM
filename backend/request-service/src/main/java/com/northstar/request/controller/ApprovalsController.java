@@ -8,13 +8,44 @@ import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+
 @RestController
 @RequestMapping("/api/approvals")
 public class ApprovalsController {
     private final LocalApprovalService approvals;
-    public ApprovalsController(LocalApprovalService approvals){this.approvals=approvals;}
-    @GetMapping("/pending") public List<?> pending(@AuthenticationPrincipal Jwt jwt){return approvals.pending(jwt.getSubject(),RequestController.isManager(jwt));}
-    @GetMapping("/history") public List<?> history(@AuthenticationPrincipal Jwt jwt){return approvals.history(jwt.getSubject(),RequestController.isManager(jwt));}
-    @PostMapping("/{id}/approve") public Object approve(@PathVariable("id") UUID id,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody(required=false) DecisionInput input){return approvals.decide(id,jwt.getSubject(),true,input==null?null:input.comment());}
-    @PostMapping("/{id}/reject") public Object reject(@PathVariable("id") UUID id,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody DecisionInput input){return approvals.decide(id,jwt.getSubject(),false,input.comment());}
+
+    public ApprovalsController(LocalApprovalService approvals) {
+        this.approvals = approvals;
+    }
+
+    @GetMapping(value = {"/inbox", "/pending"})
+    public List<?> inbox(@AuthenticationPrincipal Jwt jwt) {
+        return approvals.pending(jwt.getSubject(), RequestController.isManager(jwt));
+    }
+
+    @GetMapping("/history")
+    public List<?> history(@AuthenticationPrincipal Jwt jwt) {
+        return approvals.history(jwt.getSubject(), RequestController.isManager(jwt));
+    }
+
+    @GetMapping("/{id}")
+    public Object get(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return approvals.get(id, jwt.getSubject(), RequestController.isManager(jwt));
+    }
+
+    @PostMapping("/{id}/decision")
+    public Object decision(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DecisionInput input) {
+        boolean approve = "APPROVED".equalsIgnoreCase(input.decision()) || Boolean.TRUE.equals(input.approved());
+        return approvals.decide(id, jwt.getSubject(), approve, input.comment());
+    }
+
+    @PostMapping("/{id}/approve")
+    public Object approve(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody(required = false) DecisionInput input) {
+        return approvals.decide(id, jwt.getSubject(), true, input == null ? null : input.comment());
+    }
+
+    @PostMapping("/{id}/reject")
+    public Object reject(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DecisionInput input) {
+        return approvals.decide(id, jwt.getSubject(), false, input.comment());
+    }
 }

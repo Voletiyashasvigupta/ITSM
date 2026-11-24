@@ -21,6 +21,7 @@ public interface LocalIncidentService {
     IncidentDetailResponse detail(UUID id, String actor, boolean support);
     IncidentResponse update(UUID id, String actor, boolean support, IncidentStatusInput input);
     IncidentCommentEntity comment(UUID id, String actor, boolean support, String comment);
+    String generateNextNumber();
 }
 
 @Service
@@ -34,10 +35,44 @@ class LocalIncidentServiceImpl implements LocalIncidentService {
     }
 
     @Override
+    public String generateNextNumber() {
+        long count = incidents.count();
+        return String.format("INC%07d", 10001 + count);
+    }
+
+    @Override
     @Transactional
     public IncidentResponse create(String actor, IncidentInput input) {
-        IncidentEntity incident = new IncidentEntity(input.title().trim(), input.description().trim(),
-                input.category().trim(), input.priority(), actor);
+        String num = (input.incidentNumber() != null && !input.incidentNumber().isBlank())
+                ? input.incidentNumber().trim()
+                : generateNextNumber();
+
+        String impact = (input.impact() != null && !input.impact().isBlank()) ? input.impact().trim() : "3 - Low";
+        String urgency = (input.urgency() != null && !input.urgency().isBlank()) ? input.urgency().trim() : "3 - Low";
+        String priority = calculatePriority(impact, urgency, input.priority());
+
+        String caller = (input.caller() != null && !input.caller().isBlank()) ? input.caller().trim() : actor;
+        String shortDesc = input.effectiveShortDescription();
+        String desc = (input.description() != null) ? input.description().trim() : "";
+
+        IncidentEntity incident = new IncidentEntity(
+                num,
+                caller,
+                input.category(),
+                input.subcategory(),
+                input.service(),
+                input.serviceOffering(),
+                input.channel(),
+                input.state(),
+                impact,
+                urgency,
+                priority,
+                input.assignedTo(),
+                shortDesc,
+                desc,
+                actor
+        );
+
         return view(incidents.save(incident));
     }
 
@@ -63,13 +98,17 @@ class LocalIncidentServiceImpl implements LocalIncidentService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Support role required");
         }
         IncidentEntity incident = find(id);
-        if (input.status() != null) {
-            incident.updateStatus(input.status());
+
+        String newState = input.state() != null ? input.state() : input.status();
+        if (newState != null && !newState.isBlank()) {
+            incident.updateState(newState);
         }
-        if (input.assigneeId() != null) {
-            String assignee = input.assigneeId().isBlank() ? null : input.assigneeId().trim();
-            incident.addAssignee(assignee);
+
+        String targetAssignee = input.assignedTo() != null ? input.assignedTo() : input.assigneeId();
+        if (targetAssignee != null) {
+            incident.addAssignee(targetAssignee.isBlank() ? null : targetAssignee.trim());
         }
+
         return view(incident);
     }
 
@@ -81,20 +120,67 @@ class LocalIncidentServiceImpl implements LocalIncidentService {
         return comments.save(new IncidentCommentEntity(id, actor, comment.trim()));
     }
 
+    private String calculatePriority(String impact, String urgency, String fallbackPriority) {
+        int imp = parseSeverity(impact);
+        int urg = parseSeverity(urgency);
+
+        if (imp == 1 && urg == 1) return "1 - Critical";
+        if ((imp == 1 && urg == 2) || (imp == 2 && urg == 1)) return "2 - High";
+        if ((imp == 1 && urg == 3) || (imp == 2 && urg == 2) || (imp == 3 && urg == 1)) return "3 - Moderate";
+        if ((imp == 2 && urg == 3) || (imp == 3 && urg == 2)) return "4 - Low";
+        if (imp == 3 && urg == 3) return "4 - Low";
+
+        return (fallbackPriority != null && !fallbackPriority.isBlank()) ? fallbackPriority : "4 - Low";
+    }
+
+    private int parseSeverity(String value) {
+        if (value == null) return 3;
+        if (value.startsWith("1")) return 1;
+        if (value.startsWith("2")) return 2;
+        return 3;
+    }
+
     private IncidentEntity find(UUID id) {
         return incidents.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Incident not found"));
     }
 
     private void assertAccess(IncidentEntity incident, String actor, boolean support) {
-        if (!support && !incident.getReporterId().equals(actor)) {
+        boolean isOwner = actor.equals(incident.getReporterId()) || actor.equals(incident.getCaller());
+        if (!support && !isOwner) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot access this incident");
         }
     }
 
     private IncidentResponse view(IncidentEntity incident) {
-        return new IncidentResponse(incident.getId(), incident.getTitle(), incident.getDescription(),
-                incident.getCategory(), incident.getPriority(), incident.getStatus(), incident.getReporterId(),
-                incident.getAssigneeId(), incident.getCreatedAt(), incident.getUpdatedAt());
+        String number = incident.getIncidentNumber();
+        if (number == null || number.isBlank()) {
+            String compact = incident.getId().toString().replace("-", "").substring(0, 6).toUpperCase();
+            number = "INC" + compact;
+        }
+
+        return new IncidentResponse(
+                incident.getId(),
+                number,
+                incident.getCaller(),
+                incident.getCategory(),
+                incident.getSubcategory(),
+                incident.getService(),
+                incident.getServiceOffering(),
+                incident.getChannel(),
+                incident.getState(),
+                incident.getImpact(),
+                incident.getUrgency(),
+                incident.getPriority(),
+                incident.getAssignedTo(),
+                incident.getShortDescription(),
+                incident.getDescription(),
+                incident.getTitle(),
+                incident.getStatus(),
+                incident.getReporterId(),
+                incident.getAssigneeId(),
+                incident.getCreatedAt(),
+                incident.getUpdatedAt()
+        );
     }
 }

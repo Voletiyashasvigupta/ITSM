@@ -22,6 +22,7 @@ public interface LocalRequestService {
     RequestDetailsResponse get(UUID id, String actor, boolean manager);
     java.util.List<RequestHistoryResponse> history(UUID id, String actor, boolean manager);
     RequestDetailsResponse transition(UUID id,String actor,RequestStatus target);
+    RequestDetailsResponse cancel(UUID id, String actor, boolean manager);
 }
 
 @Service
@@ -43,6 +44,21 @@ class LocalRequestServiceImpl implements LocalRequestService {
         if("People support".equals(r.getServiceName())&&!r.getRequesterId().equals(actor)&&!r.getRequestedForId().equals(actor)&&!Objects.equals(r.getApproverId(),actor)) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Confidential People support request access is restricted");
         RequestStatus from=r.getStatus();stateMachine.require(from,target);r.setStatus(target);
         history.save(new com.northstar.request.entity.RequestHistoryEntity(id,actor,"STATUS_CHANGED",from.name(),target.name(),null));return toResponse(r);
+    }
+    @Override @org.springframework.transaction.annotation.Transactional public RequestDetailsResponse cancel(UUID id, String actor, boolean manager) {
+        ServiceRequestEntity r = find(id);
+        boolean isOwner = r.getRequesterId().equals(actor) || r.getRequestedForId().equals(actor);
+        if (!manager && !isOwner) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the requester or an administrator can cancel this request");
+        }
+        RequestStatus from = r.getStatus();
+        if (from == RequestStatus.COMPLETED || from == RequestStatus.FULFILLED || from == RequestStatus.REJECTED || from == RequestStatus.CANCELLED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Request in status " + from + " cannot be cancelled");
+        }
+        stateMachine.require(from, RequestStatus.CANCELLED);
+        r.setStatus(RequestStatus.CANCELLED);
+        history.save(new com.northstar.request.entity.RequestHistoryEntity(id, actor, "CANCELLED", from.name(), RequestStatus.CANCELLED.name(), "Request cancelled by " + actor));
+        return toResponse(r);
     }
     private ServiceRequestEntity find(UUID id) { return requests.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,"Request not found")); }
     private void assertRead(ServiceRequestEntity r,String actor,boolean manager) {
