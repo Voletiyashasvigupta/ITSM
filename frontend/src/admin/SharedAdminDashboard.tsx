@@ -146,7 +146,19 @@ export default function SharedAdminDashboard({
   const [refreshing, setRefreshing] = useState(false)
 
   // Tabs
-  const [tabs, setTabs] = useState(['Overview', 'Operations'])
+  const [tabs, setTabs] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('sn_shared_admin_dashboard')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed.tabs)) {
+          const filtered = parsed.tabs.filter((t: string) => t !== 'Operations')
+          if (filtered.length > 0) return filtered
+        }
+      }
+    } catch {}
+    return ['Overview']
+  })
   const [activeTab, setActiveTab] = useState('Overview')
   const [addTabOpen, setAddTabOpen] = useState(false)
   const [newTabName, setNewTabName] = useState('')
@@ -542,14 +554,14 @@ export default function SharedAdminDashboard({
         </Box>
       </Box>
 
-      {/* TOP ROW GRID: Open incidents | Open Request Items | Proble... | Hardening compliance score */}
+      {/* TOP ROW GRID: Open incidents | Open Request Items */}
       <Box
         className="sn-dash-grid-top"
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '2.3fr 2.3fr 0.9fr 1.8fr' },
-          gap: 1.5,
-          mb: 1.5,
+          gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
+          gap: 2,
+          mb: 2.5,
         }}
       >
         {/* 1. Open Incidents Card (REAL-TIME LIVE DATA) */}
@@ -557,19 +569,19 @@ export default function SharedAdminDashboard({
           className="sn-widget-card"
           elevation={0}
           sx={{
-            p: 1.75,
+            p: 2,
             border: '1px solid #dfe7eb',
-            borderRadius: 1,
+            borderRadius: 1.5,
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            minHeight: 195,
+            minHeight: 380,
             bgcolor: '#ffffff',
           }}
         >
-          <Box className="sn-widget-header" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Box className="sn-widget-header" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+              <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
                 Open incidents
               </Typography>
               <Chip
@@ -577,7 +589,7 @@ export default function SharedAdminDashboard({
                 label={`${openIncidents.length} active`}
                 color={openIncidents.length > 0 ? 'error' : 'success'}
                 variant="outlined"
-                sx={{ height: 18, fontSize: 10, fontWeight: 700 }}
+                sx={{ height: 20, fontSize: 10.5, fontWeight: 700 }}
               />
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#64748b' }}>
@@ -588,7 +600,7 @@ export default function SharedAdminDashboard({
           </Box>
 
           {openIncidents.length > 0 ? (
-            <Box sx={{ flex: 1, overflowY: 'auto', pr: 1.5, maxHeight: 135 }}>
+            <Box sx={{ flex: 1, overflowY: 'auto', pr: 1.5, maxHeight: 310 }}>
               {openIncidents.map((inc) => {
                 const isCritical = inc.priority?.includes('1') || inc.priority?.toLowerCase().includes('critical')
                 const isHigh = inc.priority?.includes('2') || inc.priority?.toLowerCase().includes('high')
@@ -600,9 +612,9 @@ export default function SharedAdminDashboard({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      py: 0.75,
-                      px: 1,
-                      mb: 0.75,
+                      py: 1,
+                      px: 1.25,
+                      mb: 0.85,
                       borderRadius: 1,
                       border: '1px solid #f1f5f9',
                       bgcolor: '#f8fafc',
@@ -703,19 +715,19 @@ export default function SharedAdminDashboard({
           className="sn-widget-card"
           elevation={0}
           sx={{
-            p: 1.75,
+            p: 2,
             border: '1px solid #dfe7eb',
-            borderRadius: 1,
+            borderRadius: 1.5,
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            minHeight: 195,
+            minHeight: 380,
             bgcolor: '#ffffff',
           }}
         >
-          <Box className="sn-widget-header" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Box className="sn-widget-header" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+              <Typography sx={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
                 Open Request Items
               </Typography>
               <Chip
@@ -723,7 +735,7 @@ export default function SharedAdminDashboard({
                 label={`${openRequests.length} active`}
                 color={openRequests.length > 0 ? 'warning' : 'success'}
                 variant="outlined"
-                sx={{ height: 18, fontSize: 10, fontWeight: 700 }}
+                sx={{ height: 20, fontSize: 10.5, fontWeight: 700 }}
               />
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#64748b' }}>
@@ -734,7 +746,7 @@ export default function SharedAdminDashboard({
           </Box>
 
           {openRequests.length > 0 ? (
-            <Box sx={{ flex: 1, overflowY: 'auto', pr: 1.5, maxHeight: 135 }}>
+            <Box sx={{ flex: 1, overflowY: 'auto', pr: 1.5, maxHeight: 310 }}>
               {openRequests.map((req) => {
                 const isPending = req.status?.toUpperCase().includes('PENDING')
                 const isSyncFailed = req.status?.toUpperCase().includes('SYNC')
@@ -747,9 +759,9 @@ export default function SharedAdminDashboard({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      py: 0.75,
-                      px: 1,
-                      mb: 0.75,
+                      py: 1,
+                      px: 1.25,
+                      mb: 0.85,
                       borderRadius: 1,
                       border: '1px solid #f1f5f9',
                       bgcolor: '#f8fafc',
@@ -839,67 +851,290 @@ export default function SharedAdminDashboard({
           <CornerGrip position="left" />
           <CornerGrip position="right" />
         </Paper>
+      </Box>
 
-        {/* 3. Proble... Card (REAL-TIME PROBLEMS METRIC) */}
+      {/* BOTTOM ROW GRID: 8 Operational Health & KPI Metric Cards */}
+      <Box
+        className="sn-dash-grid-bottom"
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        {/* 1. Open P1 incidents (REAL-TIME) */}
         <Paper
           className="sn-widget-card"
           elevation={0}
           onClick={() => onNavigate?.('Incidents')}
           sx={{
-            p: 1.75,
+            p: 2,
             border: '1px solid #dfe7eb',
-            borderRadius: 1,
+            borderRadius: 1.5,
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            minHeight: 195,
+            minHeight: 165,
             bgcolor: '#ffffff',
             cursor: 'pointer',
-            '&:hover': { borderColor: '#0284c7' },
+            transition: 'all 0.15s ease',
+            '&:hover': { borderColor: '#ef4444', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.08)' },
           }}
         >
-          <Box className="sn-widget-header" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#334155', lineHeight: 1.3 }}>
+              Open P1 incidents
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+              <SensorsRounded sx={{ fontSize: 15, color: p1Count > 0 ? '#ef4444' : '#64748b' }} />
+              <IconButton size="small" sx={{ p: 0.25 }}>
+                <MoreVertRounded sx={{ fontSize: 16, color: '#64748b' }} />
+              </IconButton>
+            </Box>
+          </Box>
+
+          <Typography sx={{ fontSize: 38, fontWeight: 700, color: p1Count > 0 ? '#ef4444' : '#0f172a', mt: 1, mb: 0.5, lineHeight: 1 }}>
+            {p1Count}
+          </Typography>
+
+          <Typography sx={{ fontSize: 11, color: '#64748b', mt: 'auto' }}>
+            — {p1Count} active critical incident{p1Count === 1 ? '' : 's'}
+          </Typography>
+
+          <ScrollTrack />
+          <CornerGrip position="left" />
+          <CornerGrip position="right" />
+        </Paper>
+
+        {/* 2. Aging incidents over 24 hrs (REAL-TIME) */}
+        <Paper
+          className="sn-widget-card"
+          elevation={0}
+          onClick={() => onNavigate?.('Incidents')}
+          sx={{
+            p: 2,
+            border: '1px solid #dfe7eb',
+            borderRadius: 1.5,
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 165,
+            bgcolor: '#ffffff',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            '&:hover': { borderColor: '#f59e0b', boxShadow: '0 4px 12px rgba(245, 158, 11, 0.08)' },
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#334155', lineHeight: 1.3 }}>
+              Aging incidents over 24 hrs
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+              <SensorsRounded sx={{ fontSize: 15, color: agingIncidentsCount > 0 ? '#f59e0b' : '#64748b' }} />
+              <IconButton size="small" sx={{ p: 0.25 }}>
+                <MoreVertRounded sx={{ fontSize: 16, color: '#64748b' }} />
+              </IconButton>
+            </Box>
+          </Box>
+
+          <Typography sx={{ fontSize: 38, fontWeight: 700, color: agingIncidentsCount > 0 ? '#b45309' : '#0f172a', mt: 1, mb: 0.5, lineHeight: 1 }}>
+            {agingIncidentsCount}
+          </Typography>
+
+          <Typography sx={{ fontSize: 11, color: '#64748b', mt: 'auto' }}>
+            — {agingIncidentsCount} aging past SLA target
+          </Typography>
+
+          <ScrollTrack />
+          <CornerGrip position="left" />
+          <CornerGrip position="right" />
+        </Paper>
+
+        {/* 3. Request items over 24 hrs (REAL-TIME) */}
+        <Paper
+          className="sn-widget-card"
+          elevation={0}
+          onClick={() => onNavigate?.('Requests')}
+          sx={{
+            p: 2,
+            border: '1px solid #dfe7eb',
+            borderRadius: 1.5,
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 165,
+            bgcolor: '#ffffff',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            '&:hover': { borderColor: '#0284c7', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.08)' },
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#334155', lineHeight: 1.3 }}>
+              Request items over 24 hrs
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+              <SensorsRounded sx={{ fontSize: 15, color: agingRequestsCount > 0 ? '#0284c7' : '#64748b' }} />
+              <IconButton size="small" sx={{ p: 0.25 }}>
+                <MoreVertRounded sx={{ fontSize: 16, color: '#64748b' }} />
+              </IconButton>
+            </Box>
+          </Box>
+
+          <Typography sx={{ fontSize: 38, fontWeight: 700, color: '#0f172a', mt: 1, mb: 0.5, lineHeight: 1 }}>
+            {agingRequestsCount}
+          </Typography>
+
+          <Typography sx={{ fontSize: 11, color: '#64748b', mt: 'auto' }}>
+            — {agingRequestsCount} pending over 24 hrs
+          </Typography>
+
+          <ScrollTrack />
+          <CornerGrip position="left" />
+          <CornerGrip position="right" />
+        </Paper>
+
+        {/* 4. Request items awaiting approval (REAL-TIME) */}
+        <Paper
+          className="sn-widget-card"
+          elevation={0}
+          sx={{
+            p: 2,
+            border: '1px solid #dfe7eb',
+            borderRadius: 1.5,
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 165,
+            bgcolor: '#ffffff',
+            cursor: onNavigate ? 'pointer' : 'default',
+            transition: 'all 0.15s ease',
+            '&:hover': onNavigate ? { borderColor: '#0284c7', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.08)' } : undefined,
+          }}
+          onClick={() => onNavigate?.('Approvals')}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#334155', lineHeight: 1.3 }}>
+              Request items awaiting approval
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+              <SensorsRounded sx={{ fontSize: 15, color: liveAwaitingApprovalCount > 0 ? '#0284c7' : '#64748b' }} />
+              <IconButton size="small" sx={{ p: 0.25 }}>
+                <MoreVertRounded sx={{ fontSize: 16, color: '#64748b' }} />
+              </IconButton>
+            </Box>
+          </Box>
+
+          <Typography sx={{ fontSize: 38, fontWeight: 700, color: liveAwaitingApprovalCount > 0 ? '#0284c7' : '#0f172a', mt: 1, mb: 0.5, lineHeight: 1 }}>
+            {liveAwaitingApprovalCount}
+          </Typography>
+
+          <Typography sx={{ fontSize: 11, color: '#64748b', mt: 'auto' }}>
+            — {liveAwaitingApprovalCount} awaiting manager decision
+          </Typography>
+
+          <ScrollTrack />
+          <CornerGrip position="left" />
+          <CornerGrip position="right" />
+        </Paper>
+
+        {/* 5. Problems Card (REAL-TIME PROBLEMS METRIC) */}
+        <Paper
+          className="sn-widget-card"
+          elevation={0}
+          onClick={() => onNavigate?.('Incidents')}
+          sx={{
+            p: 2,
+            border: '1px solid #dfe7eb',
+            borderRadius: 1.5,
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 165,
+            bgcolor: '#ffffff',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            '&:hover': { borderColor: '#6366f1', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)' },
+          }}
+        >
+          <Box className="sn-widget-header" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-              Proble...
+              Problems
             </Typography>
             <IconButton size="small" sx={{ p: 0.25 }} title="Options">
               <MoreVertRounded sx={{ fontSize: 16, color: '#64748b' }} />
             </IconButton>
           </Box>
 
-          <Typography
-            sx={{
-              fontSize: { xs: 36, sm: 42 },
-              fontWeight: 600,
-              color: '#0f172a',
-              my: 'auto',
-              lineHeight: 1,
-            }}
-          >
+          <Typography sx={{ fontSize: 38, fontWeight: 700, color: '#0f172a', mt: 1, mb: 0.5, lineHeight: 1 }}>
             {problemsCount}
           </Typography>
 
-          <Typography sx={{ fontSize: 10, color: '#64748b', mt: 'auto' }}>
+          <Typography sx={{ fontSize: 11, color: '#64748b', mt: 'auto' }}>
             High-impact active problems
+          </Typography>
+
+          <ScrollTrack />
+          <CornerGrip position="left" />
+          <CornerGrip position="right" />
+        </Paper>
+
+        {/* 6. Changes (REAL-TIME) */}
+        <Paper
+          className="sn-widget-card"
+          elevation={0}
+          onClick={() => onNavigate?.('Requests')}
+          sx={{
+            p: 2,
+            border: '1px solid #dfe7eb',
+            borderRadius: 1.5,
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 165,
+            bgcolor: '#ffffff',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            '&:hover': { borderColor: '#64748b', boxShadow: '0 4px 12px rgba(100, 116, 139, 0.08)' },
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+              Changes
+            </Typography>
+            <IconButton size="small" sx={{ p: 0.25 }}>
+              <MoreVertRounded sx={{ fontSize: 16, color: '#64748b' }} />
+            </IconButton>
+          </Box>
+
+          <Typography sx={{ fontSize: 38, fontWeight: 700, color: '#0f172a', mt: 1, mb: 0.5, lineHeight: 1 }}>
+            {changesCount}
+          </Typography>
+
+          <Typography sx={{ fontSize: 11, color: '#64748b', mt: 'auto' }}>
+            Upcoming scheduled change releases
           </Typography>
 
           <CornerGrip position="left" />
           <CornerGrip position="right" />
         </Paper>
 
-        {/* 4. Hardening Compliance Score Card (DYNAMIC CALCULATED SCORE) */}
+        {/* 7. Hardening Compliance Score Card (DYNAMIC CALCULATED SCORE) */}
         <Paper
           className="sn-widget-card"
           elevation={0}
           sx={{
-            p: 1.75,
+            p: 2,
             border: '1px solid #dfe7eb',
-            borderRadius: 1,
+            borderRadius: 1.5,
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            minHeight: 195,
+            minHeight: 165,
             bgcolor: '#ffffff',
+            transition: 'all 0.15s ease',
+            '&:hover': { borderColor: '#00a3e0', boxShadow: '0 4px 12px rgba(0, 163, 224, 0.08)' },
           }}
         >
           <Box className="sn-widget-header" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
@@ -911,29 +1146,20 @@ export default function SharedAdminDashboard({
             </IconButton>
           </Box>
 
-          <Typography
-            sx={{
-              fontSize: { xs: 36, sm: 40 },
-              fontWeight: 600,
-              color: '#0f172a',
-              lineHeight: 1,
-              mt: 1,
-              mb: 0.5,
-            }}
-          >
+          <Typography sx={{ fontSize: 38, fontWeight: 700, color: '#0f172a', mt: 1, mb: 0.5, lineHeight: 1 }}>
             {complianceScore}%
           </Typography>
 
           {/* Dynamic Sparkline curve based on score */}
           <Box sx={{ width: '100%', mt: 'auto', mb: 0.5 }}>
-            <svg width="100%" height="32" viewBox="0 0 160 32" fill="none" preserveAspectRatio="none">
+            <svg width="100%" height="28" viewBox="0 0 160 28" fill="none" preserveAspectRatio="none">
               <path
                 d={
                   complianceScore >= 90
                     ? 'M 4 20 L 40 10 L 100 8 L 152 6'
                     : complianceScore >= 80
-                    ? 'M 4 8 L 36 24 L 152 24'
-                    : 'M 4 6 L 40 28 L 152 28'
+                    ? 'M 4 8 L 36 22 L 152 22'
+                    : 'M 4 6 L 40 24 L 152 24'
                 }
                 stroke="#00a3e0"
                 strokeWidth="2.2"
@@ -942,7 +1168,7 @@ export default function SharedAdminDashboard({
               />
               <circle
                 cx="152"
-                cy={complianceScore >= 90 ? 6 : complianceScore >= 80 ? 24 : 28}
+                cy={complianceScore >= 90 ? 6 : complianceScore >= 80 ? 22 : 24}
                 r="2.5"
                 fill="#00a3e0"
               />
@@ -952,245 +1178,28 @@ export default function SharedAdminDashboard({
           <CornerGrip position="left" />
           <CornerGrip position="right" />
         </Paper>
-      </Box>
 
-      {/* BOTTOM ROW GRID: Open P1 | Aging incidents | Request items over 24h | Awaiting approval | Changes | Customer Actions */}
-      <Box
-        className="sn-dash-grid-bottom"
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)', md: '1.2fr 1.2fr 1.2fr 1.2fr 0.8fr 1.3fr' },
-          gap: 1.5,
-          mb: 1.5,
-        }}
-      >
-        {/* 5. Open P1 incidents (REAL-TIME) */}
-        <Paper
-          className="sn-widget-card"
-          elevation={0}
-          onClick={() => onNavigate?.('Incidents')}
-          sx={{
-            p: 1.75,
-            border: '1px solid #dfe7eb',
-            borderRadius: 1,
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 155,
-            bgcolor: '#ffffff',
-            cursor: 'pointer',
-            '&:hover': { borderColor: '#ef4444' },
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#334155', lineHeight: 1.3 }}>
-              Open P1 incidents
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-              <SensorsRounded sx={{ fontSize: 15, color: p1Count > 0 ? '#ef4444' : '#64748b' }} />
-              <IconButton size="small" sx={{ p: 0.25 }}>
-                <MoreVertRounded sx={{ fontSize: 16, color: '#64748b' }} />
-              </IconButton>
-            </Box>
-          </Box>
-
-          <Typography sx={{ fontSize: 36, fontWeight: 600, color: p1Count > 0 ? '#ef4444' : '#0f172a', mt: 0.5, mb: 0.5, lineHeight: 1 }}>
-            {p1Count}
-          </Typography>
-
-          <Typography sx={{ fontSize: 10, color: '#64748b', mt: 'auto' }}>
-            — {p1Count} active critical incident{p1Count === 1 ? '' : 's'}
-          </Typography>
-
-          <ScrollTrack />
-          <CornerGrip position="left" />
-          <CornerGrip position="right" />
-        </Paper>
-
-        {/* 6. Aging incidents over 24 hrs (REAL-TIME) */}
-        <Paper
-          className="sn-widget-card"
-          elevation={0}
-          onClick={() => onNavigate?.('Incidents')}
-          sx={{
-            p: 1.75,
-            border: '1px solid #dfe7eb',
-            borderRadius: 1,
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 155,
-            bgcolor: '#ffffff',
-            cursor: 'pointer',
-            '&:hover': { borderColor: '#0284c7' },
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#334155', lineHeight: 1.3 }}>
-              Aging incidents over 24 hrs
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-              <SensorsRounded sx={{ fontSize: 15, color: agingIncidentsCount > 0 ? '#f59e0b' : '#64748b' }} />
-              <IconButton size="small" sx={{ p: 0.25 }}>
-                <MoreVertRounded sx={{ fontSize: 16, color: '#64748b' }} />
-              </IconButton>
-            </Box>
-          </Box>
-
-          <Typography sx={{ fontSize: 36, fontWeight: 600, color: '#0f172a', mt: 0.5, mb: 0.5, lineHeight: 1 }}>
-            {agingIncidentsCount}
-          </Typography>
-
-          <Typography sx={{ fontSize: 10, color: '#64748b', mt: 'auto' }}>
-            — {agingIncidentsCount} aging past SLA target
-          </Typography>
-
-          <ScrollTrack />
-          <CornerGrip position="left" />
-          <CornerGrip position="right" />
-        </Paper>
-
-        {/* 7. Request items over 24 hrs (REAL-TIME) */}
+        {/* 8. Customer Actions (REAL-TIME) */}
         <Paper
           className="sn-widget-card"
           elevation={0}
           onClick={() => onNavigate?.('Requests')}
           sx={{
-            p: 1.75,
+            p: 2,
             border: '1px solid #dfe7eb',
-            borderRadius: 1,
+            borderRadius: 1.5,
             position: 'relative',
             display: 'flex',
             flexDirection: 'column',
-            minHeight: 155,
+            minHeight: 165,
             bgcolor: '#ffffff',
             cursor: 'pointer',
-            '&:hover': { borderColor: '#0284c7' },
+            transition: 'all 0.15s ease',
+            '&:hover': { borderColor: '#0284c7', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.08)' },
           }}
         >
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#334155', lineHeight: 1.3 }}>
-              Request items over 24 hrs
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-              <SensorsRounded sx={{ fontSize: 15, color: agingRequestsCount > 0 ? '#f59e0b' : '#64748b' }} />
-              <IconButton size="small" sx={{ p: 0.25 }}>
-                <MoreVertRounded sx={{ fontSize: 16, color: '#64748b' }} />
-              </IconButton>
-            </Box>
-          </Box>
-
-          <Typography sx={{ fontSize: 36, fontWeight: 600, color: '#0f172a', mt: 0.5, mb: 0.5, lineHeight: 1 }}>
-            {agingRequestsCount}
-          </Typography>
-
-          <Typography sx={{ fontSize: 10, color: '#64748b', mt: 'auto' }}>
-            — {agingRequestsCount} pending over 24 hrs
-          </Typography>
-
-          <ScrollTrack />
-          <CornerGrip position="left" />
-          <CornerGrip position="right" />
-        </Paper>
-
-        {/* 8. Request items awaiting approval (REAL-TIME) */}
-        <Paper
-          className="sn-widget-card"
-          elevation={0}
-          sx={{
-            p: 1.75,
-            border: '1px solid #dfe7eb',
-            borderRadius: 1,
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 155,
-            bgcolor: '#ffffff',
-            cursor: onNavigate ? 'pointer' : 'default',
-            '&:hover': onNavigate ? { borderColor: '#0284c7' } : undefined,
-          }}
-          onClick={() => onNavigate?.('Approvals')}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#334155', lineHeight: 1.3 }}>
-              Request items awaiting approval
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-              <SensorsRounded sx={{ fontSize: 15, color: liveAwaitingApprovalCount > 0 ? '#0284c7' : '#64748b' }} />
-              <IconButton size="small" sx={{ p: 0.25 }}>
-                <MoreVertRounded sx={{ fontSize: 16, color: '#64748b' }} />
-              </IconButton>
-            </Box>
-          </Box>
-
-          <Typography sx={{ fontSize: 36, fontWeight: 600, color: liveAwaitingApprovalCount > 0 ? '#0284c7' : '#0f172a', mt: 0.5, mb: 0.5, lineHeight: 1 }}>
-            {liveAwaitingApprovalCount}
-          </Typography>
-
-          <Typography sx={{ fontSize: 10, color: '#64748b', mt: 'auto' }}>
-            — {liveAwaitingApprovalCount} awaiting manager decision
-          </Typography>
-
-          <ScrollTrack />
-          <CornerGrip position="left" />
-          <CornerGrip position="right" />
-        </Paper>
-
-        {/* 9. Changes (REAL-TIME) */}
-        <Paper
-          className="sn-widget-card"
-          elevation={0}
-          onClick={() => onNavigate?.('Requests')}
-          sx={{
-            p: 1.75,
-            border: '1px solid #dfe7eb',
-            borderRadius: 1,
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 155,
-            bgcolor: '#ffffff',
-            cursor: 'pointer',
-            '&:hover': { borderColor: '#0284c7' },
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
-              Changes
-            </Typography>
-            <IconButton size="small" sx={{ p: 0.25 }}>
-              <MoreVertRounded sx={{ fontSize: 16, color: '#64748b' }} />
-            </IconButton>
-          </Box>
-
-          <Typography sx={{ fontSize: 36, fontWeight: 600, color: '#0f172a', my: 'auto', lineHeight: 1 }}>
-            {changesCount}
-          </Typography>
-
-          <CornerGrip position="left" />
-          <CornerGrip position="right" />
-        </Paper>
-
-        {/* 10. Customer Actions (REAL-TIME) */}
-        <Paper
-          className="sn-widget-card"
-          elevation={0}
-          onClick={() => onNavigate?.('Requests')}
-          sx={{
-            p: 1.75,
-            border: '1px solid #dfe7eb',
-            borderRadius: 1,
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column',
-            minHeight: 155,
-            bgcolor: '#ffffff',
-            cursor: 'pointer',
-            '&:hover': { borderColor: '#0284c7' },
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
               Customer Actions
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
@@ -1201,11 +1210,11 @@ export default function SharedAdminDashboard({
             </Box>
           </Box>
 
-          <Typography sx={{ fontSize: 36, fontWeight: 600, color: '#0f172a', mt: 0.5, mb: 0.5, lineHeight: 1 }}>
+          <Typography sx={{ fontSize: 38, fontWeight: 700, color: '#0f172a', mt: 1, mb: 0.5, lineHeight: 1 }}>
             {customerActionsCount}
           </Typography>
 
-          <Typography sx={{ fontSize: 10, color: '#64748b', mt: 'auto' }}>
+          <Typography sx={{ fontSize: 11, color: '#64748b', mt: 'auto' }}>
             — {customerActionsCount} item{customerActionsCount === 1 ? '' : 's'} requiring user follow-up
           </Typography>
 
@@ -1220,9 +1229,9 @@ export default function SharedAdminDashboard({
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)', md: 'repeat(4, 1fr)' },
-            gap: 1.5,
-            mt: 1.5,
+            gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+            gap: 2,
+            mb: 3,
           }}
         >
           {customWidgets.map((widget) => (
@@ -1231,18 +1240,20 @@ export default function SharedAdminDashboard({
               className="sn-widget-card"
               elevation={0}
               sx={{
-                p: 1.75,
+                p: 2,
                 border: '1px solid #dfe7eb',
-                borderRadius: 1,
+                borderRadius: 1.5,
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column',
-                minHeight: 155,
+                minHeight: 165,
                 bgcolor: '#ffffff',
+                transition: 'all 0.15s ease',
+                '&:hover': { borderColor: '#0284c7', boxShadow: '0 4px 12px rgba(2, 132, 199, 0.08)' },
               }}
             >
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
                   {widget.title}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>

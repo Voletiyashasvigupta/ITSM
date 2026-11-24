@@ -35,7 +35,27 @@ export default function AuthScreen() {
   return <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, background: 'linear-gradient(135deg, #eef3f5 0%, #e2ecee 100%)' }}>
     <Paper component="form" onSubmit={submit} elevation={0} sx={{ width: 'min(100%, 430px)', p: { xs: 3, sm: 4 }, border: '1px solid #dfe8eb', borderRadius: 4 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
-        <Box sx={{ width: 40, height: 40, borderRadius: 2, display: 'grid', placeItems: 'center', color: 'white', bgcolor: 'primary.main', fontWeight: 800, fontSize: 13, letterSpacing: '-0.5px' }}>ITSM</Box>
+        <Box
+          sx={{
+            width: 40,
+            height: 40,
+            borderRadius: 2,
+            display: 'grid',
+            placeItems: 'center',
+            background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%)',
+            boxShadow: '0 4px 12px rgba(2, 132, 199, 0.35)',
+            p: '5px',
+          }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" stroke="#ffffff" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M12 12L12 22M12 12L20.66 7M12 12L3.34 7" stroke="#bae6fd" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="12" cy="12" r="2.5" fill="#ffffff" />
+            <circle cx="12" cy="4" r="1.5" fill="#bae6fd" />
+            <circle cx="19" cy="16" r="1.5" fill="#bae6fd" />
+            <circle cx="5" cy="16" r="1.5" fill="#bae6fd" />
+          </svg>
+        </Box>
         <Box><Typography sx={{ fontWeight: 800, fontSize: 19, color: '#16324f' }}>ITSM</Typography><Typography variant="caption" color="text.secondary">INTERNAL SERVICE HUB</Typography></Box>
       </Box>
       <Typography variant="h5" sx={{ fontWeight: 750, mb: 0.5 }}>{mode === 'login' ? 'Welcome back' : 'Create your account'}</Typography>

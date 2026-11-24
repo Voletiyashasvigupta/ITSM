@@ -50,6 +50,10 @@ import LastPageRounded from '@mui/icons-material/LastPageRounded'
 import KeyboardArrowLeftRounded from '@mui/icons-material/KeyboardArrowLeftRounded'
 import TimelineRounded from '@mui/icons-material/TimelineRounded'
 import CheckRounded from '@mui/icons-material/CheckRounded'
+import CheckCircleOutlineRounded from '@mui/icons-material/CheckCircleOutlineRounded'
+import ErrorOutlineRounded from '@mui/icons-material/ErrorOutlineRounded'
+import HourglassEmptyRounded from '@mui/icons-material/HourglassEmptyRounded'
+import DoneAllRounded from '@mui/icons-material/DoneAllRounded'
 import AnalyticsRounded from '@mui/icons-material/AnalyticsRounded'
 import SharedAdminDashboard from './admin/SharedAdminDashboard'
 import AuthScreen from './auth/AuthScreen'
@@ -246,7 +250,7 @@ function conditionalRequestFields(service: string, values: Record<string, string
 const employeeNav = [
   { label: 'Overview', icon: <DashboardRounded /> },
   { label: 'Service catalog', icon: <SearchRounded /> },
-  { label: 'My requests', icon: <ReceiptLongRounded /> },
+  { label: 'Requests', icon: <ReceiptLongRounded /> },
 ]
 const managementNav = [
   { label: 'Admin dashboard', icon: <AnalyticsRounded /> },
@@ -307,6 +311,110 @@ export default function App() {
   const [receipt, setReceipt] = useState<RequestReceiptData | null>(null)
   const [notificationsAnchor, setNotificationsAnchor] = useState<HTMLElement | null>(null)
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null)
+  const [readNotifIds, setReadNotifIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('itsm_read_notifications')
+      return saved ? (JSON.parse(saved) as string[]) : []
+    } catch {
+      return []
+    }
+  })
+  const [notifFilter, setNotifFilter] = useState<'all' | 'requests' | 'incidents' | 'approvals'>('all')
+
+  const notificationsList = useMemo(() => {
+    const list: Array<{
+      id: string
+      type: 'request' | 'incident' | 'approval'
+      ticketNumber: string
+      title: string
+      status: string
+      timestamp: number
+      rawRecord: any
+    }> = []
+
+    approvals.forEach((app) => {
+      const time = app.requested ? new Date(app.requested).getTime() : Date.now()
+      list.push({
+        id: `app-${app.id}`,
+        type: 'approval',
+        ticketNumber: app.requestNumber || 'APPROVAL',
+        title: `${app.title} (From ${app.employee})`,
+        status: 'PENDING APPROVAL',
+        timestamp: isNaN(time) ? Date.now() : time,
+        rawRecord: app,
+      })
+    })
+
+    incidentRows.forEach((inc) => {
+      const time = inc.createdAt ? new Date(inc.createdAt).getTime() : Date.now()
+      list.push({
+        id: `inc-${inc.id}`,
+        type: 'incident',
+        ticketNumber: inc.incidentNumber || inc.id.slice(0, 8),
+        title: inc.shortDescription || inc.title || 'Incident reported',
+        status: inc.state || inc.status || 'NEW',
+        timestamp: isNaN(time) ? Date.now() : time,
+        rawRecord: inc,
+      })
+    })
+
+    requests.forEach((req) => {
+      const time = req.createdAt ? new Date(req.createdAt).getTime() : (req.date ? new Date(req.date).getTime() : Date.now())
+      list.push({
+        id: `req-${req.backendId || req.id}`,
+        type: 'request',
+        ticketNumber: req.id,
+        title: req.title,
+        status: req.status,
+        timestamp: isNaN(time) ? Date.now() : time,
+        rawRecord: req,
+      })
+    })
+
+    return list.sort((a, b) => b.timestamp - a.timestamp)
+  }, [requests, incidentRows, approvals])
+
+  const unreadCount = useMemo(() => {
+    const readSet = new Set(readNotifIds)
+    return notificationsList.filter((n) => !readSet.has(n.id)).length
+  }, [notificationsList, readNotifIds])
+
+  function markAllNotificationsRead() {
+    const allIds = notificationsList.map((n) => n.id)
+    setReadNotifIds(allIds)
+    try {
+      localStorage.setItem('itsm_read_notifications', JSON.stringify(allIds))
+    } catch {}
+  }
+
+  function handleNotificationClick(notif: (typeof notificationsList)[0]) {
+    if (!readNotifIds.includes(notif.id)) {
+      const updated = [...readNotifIds, notif.id]
+      setReadNotifIds(updated)
+      try {
+        localStorage.setItem('itsm_read_notifications', JSON.stringify(updated))
+      } catch {}
+    }
+    setNotificationsAnchor(null)
+
+    if (notif.type === 'request') {
+      void openRequest(notif.rawRecord)
+    } else if (notif.type === 'incident') {
+      void openIncident(notif.rawRecord.id)
+    } else if (notif.type === 'approval') {
+      setActive('Approvals')
+    }
+  }
+
+  function formatRelativeTime(timestamp: number) {
+    if (!timestamp || isNaN(timestamp)) return 'Recent'
+    const diff = Math.floor((Date.now() - timestamp) / 1000)
+    if (diff < 45) return 'Just now'
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`
+    return new Date(timestamp).toLocaleDateString()
+  }
   const [impersonationOpen, setImpersonationOpen] = useState(false)
   const [impersonationUsers, setImpersonationUsers] = useState<PortalUser[]>([])
   const [impersonationUserId, setImpersonationUserId] = useState('')
@@ -317,7 +425,7 @@ export default function App() {
     '/dashboard': 'Admin dashboard',
     '/manage/dashboard': 'Admin dashboard',
     '/catalog': 'Service catalog',
-    '/requests': 'My requests',
+    '/requests': 'Requests',
     '/manage/requests': 'Requests',
     '/approvals': 'Approvals',
     '/incidents': 'Incidents',
@@ -331,7 +439,7 @@ export default function App() {
     'Dashboard': '/dashboard',
     'Service catalog': '/catalog',
     'My requests': '/requests',
-    'Requests': '/manage/requests',
+    'Requests': isManagerAdmin ? '/manage/requests' : '/requests',
     'Approvals': '/approvals',
     'Incidents': '/incidents',
     'User access': '/access',
@@ -410,12 +518,12 @@ export default function App() {
       return
     }
     if (active === 'Request Detail') {
-      setActive(isManagerAdmin ? 'Requests' : 'My requests')
+      setActive('Requests')
       setRequestDetail(null)
       return
     }
     if (active === 'Request receipt') {
-      setActive(isManagerAdmin ? 'Requests' : 'My requests')
+      setActive('Requests')
       setReceipt(null)
       return
     }
@@ -931,14 +1039,39 @@ export default function App() {
 
   return <Box className="app-shell">
     <Box component="aside" className="sidebar">
-      <Box className="brand"><Box className="brand-mark" sx={{ fontSize: '11px', fontWeight: 800, letterSpacing: '-0.5px' }}>ITSM</Box><Box><Typography className="brand-name">ITSM</Typography><Typography className="brand-caption">SERVICE HUB</Typography></Box></Box>
+      <Box className="brand">
+        <Box
+          className="brand-mark"
+          sx={{
+            background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%)',
+            boxShadow: '0 4px 12px rgba(2, 132, 199, 0.35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: '5px',
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" stroke="#ffffff" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M12 12L12 22M12 12L20.66 7M12 12L3.34 7" stroke="#bae6fd" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="12" cy="12" r="2.5" fill="#ffffff" />
+            <circle cx="12" cy="4" r="1.5" fill="#bae6fd" />
+            <circle cx="19" cy="16" r="1.5" fill="#bae6fd" />
+            <circle cx="5" cy="16" r="1.5" fill="#bae6fd" />
+          </svg>
+        </Box>
+        <Box>
+          <Typography className="brand-name">ITSM</Typography>
+          <Typography className="brand-caption">SERVICE HUB</Typography>
+        </Box>
+      </Box>
       <Box className="workspace-label">WORKSPACE</Box>
       <List className="nav-list" disablePadding>
         {(isManagerAdmin
           ? [
               { label: 'Admin dashboard', icon: <AnalyticsRounded /> },
               { label: 'Service catalog', icon: <SearchRounded /> },
-              { label: 'My requests', icon: <ReceiptLongRounded /> },
+              { label: 'Requests', icon: <ReceiptLongRounded /> },
             ]
           : employeeNav
         ).map((item) => <ListItemButton key={item.label} selected={active === item.label || (isManagerAdmin && item.label === 'Admin dashboard' && active === 'Overview')} onClick={() => { setSelectedService(null); setRequestFields({}); setActive(item.label) }} className="nav-item">
@@ -948,7 +1081,6 @@ export default function App() {
       </List>
       {isManagerAdmin && <><Box className="workspace-label management-label">MANAGEMENT</Box><List className="nav-list" disablePadding>
         {[
-          { label: 'Requests', icon: <ReceiptLongRounded /> },
           { label: 'Approvals', icon: <TaskAltRounded /> },
           { label: 'User access', icon: <ManageAccountsRounded /> },
         ].map((item) => <ListItemButton key={item.label} selected={active === item.label} onClick={() => { setSelectedService(null); setRequestFields({}); setActive(item.label) }} className="nav-item">
@@ -956,7 +1088,26 @@ export default function App() {
         </ListItemButton>)}
       </List></>}
       <Box className="sidebar-bottom"><Divider /><ListItemButton onClick={() => { setSelectedService(null); setRequestFields({}); setActive('Settings') }} className="nav-item settings-item"><ListItemIcon><SettingsOutlined /></ListItemIcon><ListItemText primary="Settings" /></ListItemButton>
-        <Box className="profile"><Avatar className="profile-avatar">{initials}</Avatar><Box sx={{ minWidth: 0, flex: 1 }}><Typography className="profile-name">{user.fullName}</Typography><Typography className="profile-role">{user.role === 'MANAGER_ADMIN' ? 'Manager + Administrator' : 'Employee'}</Typography></Box><IconButton aria-label="Sign out" size="small" onClick={logout}><LogoutRounded fontSize="small" /></IconButton></Box>
+        <Box className="profile">
+          <Avatar className="profile-avatar">{initials}</Avatar>
+          <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden', mr: 0.5 }}>
+            <Typography className="profile-name" title={user.fullName} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user.fullName}
+            </Typography>
+            <Typography className="profile-role" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user.role === 'MANAGER_ADMIN' ? 'Manager + Administrator' : 'Employee'}
+            </Typography>
+          </Box>
+          <IconButton
+            aria-label="Sign out"
+            size="small"
+            title="Sign out"
+            onClick={logout}
+            sx={{ flexShrink: 0, color: '#64748b', p: 0.5, '&:hover': { color: '#ef4444', bgcolor: '#fee2e2' } }}
+          >
+            <LogoutRounded fontSize="small" />
+          </IconButton>
+        </Box>
       </Box>
     </Box>
 
@@ -988,9 +1139,208 @@ export default function App() {
           <Typography className="crumb">Workspace <span>/</span> {active}</Typography>
         </Box>
         <Box className="topbar-actions"><TextField inputRef={searchRef} size="small" placeholder="Search services" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { setSelectedService(null); setRequestFields({}); setActive('Service catalog') } }} className="search-field" slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small" /></InputAdornment>, endAdornment: <InputAdornment position="end"><IconButton aria-label="Search services" size="small" onClick={() => { setSelectedService(null); setRequestFields({}); setActive('Service catalog') }}><SearchRounded fontSize="small" /></IconButton><kbd>Ctrl K</kbd></InputAdornment> } }} />
-          <IconButton aria-label="Notifications" className="notification-button" onClick={(event) => setNotificationsAnchor(event.currentTarget)}><Badge color="error" badgeContent={requests.length} max={9}><NotificationsNoneRounded /></Badge></IconButton>
+          <IconButton aria-label="Notifications" className="notification-button" onClick={(event) => setNotificationsAnchor(event.currentTarget)}>
+            <Badge color="error" badgeContent={unreadCount} max={99}>
+              <NotificationsNoneRounded />
+            </Badge>
+          </IconButton>
           <IconButton aria-label="Open account menu" onClick={(event) => setProfileAnchor(event.currentTarget)} sx={{ p: 0 }}><Avatar className="top-avatar">{initials}</Avatar></IconButton>
-          <Menu anchorEl={notificationsAnchor} open={Boolean(notificationsAnchor)} onClose={() => setNotificationsAnchor(null)}><Box sx={{ px: 2, py: 1 }}><Typography sx={{ fontWeight: 700, fontSize: 13 }}>Notifications</Typography></Box><Divider />{requests.length === 0 ? <MenuItem disabled><ListItemText primary="You’re all caught up" secondary="Request updates will appear here." /></MenuItem> : requests.slice(0, 5).map((request) => <MenuItem key={request.id} onClick={() => { setNotificationsAnchor(null); setSelectedService(null); setRequestFields({}); setActive('My requests') }}><ListItemText primary={request.title} secondary={`${request.id} · ${request.status}`} /></MenuItem>)}</Menu>
+          <Menu
+            anchorEl={notificationsAnchor}
+            open={Boolean(notificationsAnchor)}
+            onClose={() => setNotificationsAnchor(null)}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            slotProps={{
+              paper: {
+                sx: {
+                  width: { xs: 320, sm: 410 },
+                  maxWidth: '96vw',
+                  maxHeight: 520,
+                  borderRadius: 2.5,
+                  boxShadow: '0 16px 36px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.08)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  p: 0,
+                },
+              },
+            }}
+          >
+            <Box sx={{ p: 2, pb: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>
+                  Notifications
+                </Typography>
+                {unreadCount > 0 ? (
+                  <Chip label={`${unreadCount} new`} size="small" color="primary" sx={{ height: 20, fontSize: 11, fontWeight: 700 }} />
+                ) : (
+                  <Chip label="All caught up" size="small" sx={{ height: 20, fontSize: 10, fontWeight: 600, bgcolor: '#f1f5f9' }} />
+                )}
+              </Box>
+
+              {unreadCount > 0 && (
+                <Button
+                  size="small"
+                  startIcon={<DoneAllRounded sx={{ fontSize: 15 }} />}
+                  onClick={markAllNotificationsRead}
+                  sx={{ textTransform: 'none', fontSize: 11, fontWeight: 600, p: 0.5, minWidth: 'auto', color: '#0284c7' }}
+                >
+                  Mark all read
+                </Button>
+              )}
+            </Box>
+
+            <Box sx={{ px: 2, py: 1, bgcolor: '#f8fafc', display: 'flex', gap: 0.75, borderBottom: '1px solid #f1f5f9', overflowX: 'auto' }}>
+              {(['all', 'requests', 'incidents', 'approvals'] as const).map((tab) => {
+                const count = tab === 'all'
+                  ? notificationsList.length
+                  : notificationsList.filter((n) => n.type === (tab === 'approvals' ? 'approval' : tab === 'requests' ? 'request' : 'incident')).length
+                if (tab === 'approvals' && count === 0 && !isManagerAdmin) return null
+                return (
+                  <Chip
+                    key={tab}
+                    size="small"
+                    clickable
+                    label={`${tab.charAt(0).toUpperCase() + tab.slice(1)} (${count})`}
+                    variant={notifFilter === tab ? 'filled' : 'outlined'}
+                    color={notifFilter === tab ? 'primary' : 'default'}
+                    onClick={() => setNotifFilter(tab)}
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: notifFilter === tab ? 700 : 500,
+                      height: 24,
+                      bgcolor: notifFilter === tab ? '#0284c7' : '#ffffff',
+                    }}
+                  />
+                )
+              })}
+            </Box>
+
+            <Box sx={{ overflowY: 'auto', flex: 1, maxHeight: 360 }}>
+              {(() => {
+                const filtered = notifFilter === 'all'
+                  ? notificationsList
+                  : notificationsList.filter((n) => n.type === (notifFilter === 'approvals' ? 'approval' : notifFilter === 'requests' ? 'request' : 'incident'))
+
+                if (filtered.length === 0) {
+                  return (
+                    <Box sx={{ p: 4, textAlign: 'center' }}>
+                      <CheckCircleOutlineRounded sx={{ fontSize: 38, color: '#10b981', mb: 1, opacity: 0.8 }} />
+                      <Typography sx={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>
+                        No notifications in this view
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: '#64748b', mt: 0.5 }}>
+                        Ticket updates and approval events will appear here in real-time.
+                      </Typography>
+                    </Box>
+                  )
+                }
+
+                return filtered.map((notif) => {
+                  const isRead = readNotifIds.includes(notif.id)
+                  const statusUpper = notif.status.toUpperCase()
+
+                  let statusColor: 'success' | 'error' | 'warning' | 'info' | 'default' = 'info'
+                  let StatusIcon = HelpOutlineRounded
+                  let borderColor = '#94a3b8'
+
+                  if (statusUpper.includes('APPROV') || statusUpper.includes('RESOLV') || statusUpper.includes('CLOSE') || statusUpper.includes('COMPLETE')) {
+                    statusColor = 'success'
+                    StatusIcon = CheckCircleOutlineRounded
+                    borderColor = '#10b981'
+                  } else if (statusUpper.includes('REJECT') || statusUpper.includes('CANCEL')) {
+                    statusColor = 'error'
+                    StatusIcon = ErrorOutlineRounded
+                    borderColor = '#ef4444'
+                  } else if (statusUpper.includes('PEND') || statusUpper.includes('FAIL') || statusUpper.includes('WAIT')) {
+                    statusColor = 'warning'
+                    StatusIcon = HourglassEmptyRounded
+                    borderColor = '#f59e0b'
+                  } else {
+                    statusColor = 'info'
+                    StatusIcon = SupportAgentRounded
+                    borderColor = '#0284c7'
+                  }
+
+                  return (
+                    <Box
+                      key={notif.id}
+                      onClick={() => handleNotificationClick(notif)}
+                      sx={{
+                        p: 1.5,
+                        px: 2,
+                        cursor: 'pointer',
+                        bgcolor: isRead ? '#ffffff' : '#f0f9ff',
+                        borderLeft: `3px solid ${borderColor}`,
+                        borderBottom: '1px solid #f1f5f9',
+                        transition: 'all 0.15s ease',
+                        '&:hover': {
+                          bgcolor: isRead ? '#f8fafc' : '#e0f2fe',
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          <StatusIcon sx={{ fontSize: 15, color: borderColor }} />
+                          <Typography sx={{ fontSize: 10, fontWeight: 800, color: borderColor, letterSpacing: 0.5 }}>
+                            {notif.type.toUpperCase()}
+                          </Typography>
+                          <Typography sx={{ fontSize: 10, color: '#94a3b8' }}>·</Typography>
+                          <Typography sx={{ fontSize: 10, color: '#64748b', fontWeight: 600 }}>
+                            {notif.ticketNumber}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          <Typography sx={{ fontSize: 10, color: '#64748b', whiteSpace: 'nowrap' }}>
+                            {formatRelativeTime(notif.timestamp)}
+                          </Typography>
+                          {!isRead && (
+                            <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#0284c7' }} />
+                          )}
+                        </Box>
+                      </Box>
+
+                      <Typography sx={{ fontWeight: isRead ? 600 : 700, fontSize: 12.5, color: '#0f172a', mt: 0.5, lineHeight: 1.35 }}>
+                        {notif.title}
+                      </Typography>
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
+                        <Chip
+                          label={notif.status}
+                          size="small"
+                          color={statusColor}
+                          variant="outlined"
+                          sx={{ height: 19, fontSize: 9.5, fontWeight: 700, px: 0.25 }}
+                        />
+                        <Typography sx={{ fontSize: 11, color: '#0284c7', fontWeight: 600 }}>
+                          View details →
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )
+                })
+              })()}
+            </Box>
+
+            <Box sx={{ p: 1.25, px: 2, bgcolor: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Button
+                size="small"
+                onClick={() => { setNotificationsAnchor(null); setActive('Requests') }}
+                sx={{ textTransform: 'none', fontSize: 11, fontWeight: 600, color: '#475569', p: 0 }}
+              >
+                All requests
+              </Button>
+              <Button
+                size="small"
+                onClick={() => { setNotificationsAnchor(null); setActive('Incidents') }}
+                sx={{ textTransform: 'none', fontSize: 11, fontWeight: 600, color: '#475569', p: 0 }}
+              >
+                All incidents
+              </Button>
+            </Box>
+          </Menu>
           <Menu anchorEl={profileAnchor} open={Boolean(profileAnchor)} onClose={() => setProfileAnchor(null)}><Box sx={{ px: 2, py: 1.25 }}><Typography sx={{ fontWeight: 700, fontSize: 13 }}>{user.fullName}</Typography><Typography color="text.secondary" sx={{ fontSize: 11 }}>{user.email}</Typography><Typography color="text.secondary" sx={{ fontSize: 10, mt: .5 }}>{isManagerAdmin ? 'Manager + Administrator' : 'Employee'}</Typography></Box><Divider />{isManagerAdmin && !isImpersonating && <MenuItem onClick={() => { setProfileAnchor(null); setImpersonationUserId(''); setImpersonationOpen(true) }}>Test as user</MenuItem>}<MenuItem onClick={() => { setProfileAnchor(null); setSelectedService(null); setRequestFields({}); setActive('Settings') }}>Account settings</MenuItem><MenuItem onClick={() => { setProfileAnchor(null); logout() }}>Sign out</MenuItem></Menu>
         </Box>
       </Toolbar></AppBar>
@@ -1009,7 +1359,11 @@ export default function App() {
               <Typography variant="h4" className="page-title">{title}</Typography>
               <Typography className="page-subtitle">{selectedService ? 'Complete the details below so the right team can handle your request.' : active === 'Overview' ? 'Your internal banking services, requests, and approvals.' : `Manage your ${active.toLowerCase()} in one place.`}</Typography>
             </Box>
-            {!selectedService && <Button variant="contained" startIcon={<ControlPointRounded />} onClick={() => setActive('Service catalog')}>New request</Button>}
+            {!selectedService && !['User access', 'Approvals', 'Incidents', 'Settings'].includes(active) && (
+              <Button variant="contained" startIcon={<ControlPointRounded />} onClick={() => setActive('Service catalog')}>
+                New request
+              </Button>
+            )}
           </Box>
         )}
         <Box key={`${active}-${selectedService ?? ''}`} className="page-transition">
@@ -1109,13 +1463,13 @@ export default function App() {
             requesterName={user?.id === requestDetail.requesterId ? user.fullName : impersonationUsers.find((candidate) => candidate.id === requestDetail.requesterId)?.fullName || requestDetail.requesterId}
             requestedForName={user?.id === requestDetail.requestedForId ? user.fullName : impersonationUsers.find((candidate) => candidate.id === requestDetail.requestedForId)?.fullName || requestDetail.requestedForId}
             approverName={approvers.find((candidate) => candidate.id === requestDetail.approverId)?.fullName}
-            onBack={() => { setActive(isManagerAdmin ? 'Requests' : 'My requests'); setRequestDetail(null) }}
+            onBack={() => { setActive('Requests'); setRequestDetail(null) }}
             apiFetch={apiFetch}
             setToast={setToast}
             onRefreshWorkspace={loadWorkspace}
             onAddItem={() => setActive('Service catalog')}
           />
-        ) : selectedService ? <ServiceRequestForm service={selectedService} values={requestFields} setValues={setRequestFields} approvers={approvers} approversLoading={approversLoading} busy={busy} onCancel={() => { setSelectedService(null); setRequestFields({}) }} onSubmit={() => void submitRequest(selectedService)} /> : active === 'Request receipt' && receipt ? <RequestReceipt receipt={receipt} onRequests={() => setActive('My requests')} onCatalog={() => setActive('Service catalog')} /> : active === 'Settings' ? <PasswordSettings /> : active === 'User access' && isManagerAdmin ? <UserAccessPage /> : (active === 'Admin dashboard' || (isManagerAdmin && (active === 'Overview' || active === 'Dashboard'))) ? <SharedAdminDashboard requestsCount={requests.length} pendingApprovalsCount={approvals.length} openIncidentsCount={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status)).length} p1IncidentsCount={incidentRows.filter((i) => i.priority?.includes('1') || i.priority?.toLowerCase().includes('critical')).length} incidentsList={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status))} requestsList={requests} onNavigate={(page) => setActive(page)} onRefresh={loadWorkspace} onOpenIncident={openIncident} onOpenRequest={openRequest} onBack={handleGlobalBack} setToast={setToast} /> : active === 'Incidents' ? (
+        ) : selectedService ? <ServiceRequestForm service={selectedService} values={requestFields} setValues={setRequestFields} approvers={approvers} approversLoading={approversLoading} busy={busy} onCancel={() => { setSelectedService(null); setRequestFields({}) }} onSubmit={() => void submitRequest(selectedService)} /> : active === 'Request receipt' && receipt ? <RequestReceipt receipt={receipt} onRequests={() => setActive('Requests')} onCatalog={() => setActive('Service catalog')} /> : active === 'Settings' ? <PasswordSettings onNavigate={(page) => setActive(page)} setToast={setToast} /> : active === 'User access' && isManagerAdmin ? <UserAccessPage /> : (active === 'Admin dashboard' || (isManagerAdmin && (active === 'Overview' || active === 'Dashboard'))) ? <SharedAdminDashboard requestsCount={requests.length} pendingApprovalsCount={approvals.length} openIncidentsCount={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status)).length} p1IncidentsCount={incidentRows.filter((i) => i.priority?.includes('1') || i.priority?.toLowerCase().includes('critical')).length} incidentsList={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status))} requestsList={requests} onNavigate={(page) => setActive(page)} onRefresh={loadWorkspace} onOpenIncident={openIncident} onOpenRequest={openRequest} onBack={handleGlobalBack} setToast={setToast} /> : active === 'Incidents' ? (
           <Paper className="content-card">
             <Box className="section-heading in-card">
               <Box>
@@ -1661,12 +2015,14 @@ export default function App() {
           <Box className="catalog-toolbar"><Box><Typography variant="h6">Browse by team</Typography><Typography className="section-note">Choose a team to narrow the service list.</Typography></Box><Box className="catalog-filters">{['All teams', 'IT', 'Facilities', 'HR'].map((team) => <Chip key={team} label={team} clickable color={catalogFilter === team ? 'primary' : 'default'} variant={catalogFilter === team ? 'filled' : 'outlined'} onClick={() => setCatalogFilter(team)} />)}</Box></Box>
           {!liveCatalog.length && <Alert severity="warning" sx={{ mb: 2 }}>The live catalog is unavailable. These sample services can be used for local requests.</Alert>}<Box className="section-heading catalog-list-heading"><Box><Typography variant="h6">Available services</Typography><Typography className="section-note">{displayedCatalog.length} {displayedCatalog.length === 1 ? 'service' : 'services'} match your selection.</Typography></Box><Chip label={liveCatalog.length ? (catalogStale ? 'Last known data' : 'ServiceNow catalog') : 'Sample catalog'} variant="outlined" /></Box>
           <Box className="service-grid">{displayedCatalog.map((service, index) => <ButtonBase component={Paper} key={`${service.title}-${index}`} className="service-card" aria-label={`Start request: ${service.title}`} onClick={() => void openServiceForm(service.title)}><Box className={`service-icon ${service.tint}`}>{service.icon}</Box><Chip size="small" label={service.group} className="group-chip" /><Typography className="service-title">{service.title}</Typography><Typography className="service-description">{service.description}</Typography><Box className="service-action">Start a request <KeyboardArrowRightRounded /></Box></ButtonBase>)}</Box>
-        </> : active === 'My requests' ? <>
-          <Paper className="content-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Your requests</Typography><Typography className="section-note">Requests are saved to your account and remain here after you sign out.</Typography></Box><Button variant="outlined" startIcon={<ControlPointRounded />} onClick={() => setActive('Service catalog')}>New request</Button></Box><RequestTable requests={requests} onOpen={openRequest} /></Paper>
-        </> : active === 'Requests' && isManagerAdmin ? <>
-          <Paper className="content-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Request queue</Typography><Typography className="section-note">Review requests from employees or start a new request from the service catalog.</Typography></Box><Button variant="contained" startIcon={<ControlPointRounded />} onClick={() => setActive('Service catalog')}>Add new request</Button></Box>
-            <RequestTable requests={requests} onOpen={openRequest} />
-          </Paper>
+        </> : (active === 'Requests' || active === 'My requests') ? <>
+          {isManagerAdmin ? (
+            <Paper className="content-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Request queue</Typography><Typography className="section-note">Review requests from employees or start a new request from the service catalog.</Typography></Box><Button variant="contained" startIcon={<ControlPointRounded />} onClick={() => setActive('Service catalog')}>Add new request</Button></Box>
+              <RequestTable requests={requests} onOpen={openRequest} />
+            </Paper>
+          ) : (
+            <Paper className="content-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Your requests</Typography><Typography className="section-note">Requests are saved to your account and remain here after you sign out.</Typography></Box><Button variant="outlined" startIcon={<ControlPointRounded />} onClick={() => setActive('Service catalog')}>New request</Button></Box><RequestTable requests={requests} onOpen={openRequest} /></Paper>
+          )}
         </> : active === 'Approvals' ? <>
           <Paper className="content-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Approval queue</Typography><Typography className="section-note">Only the employee selected as approver can decide.</Typography></Box><Chip size="small" label={`${approvals.length} pending`} color="warning" variant="outlined" /></Box>
             <ApprovalQueue approvals={approvals} onApprove={(id) => void decideApproval(id,true)} onReject={(id) => void decideApproval(id,false)} />
@@ -1681,7 +2037,7 @@ export default function App() {
             <StatCard label="Pending approvals" value={String(approvals.length)} delta="Assigned to your account" icon={<TaskAltRounded />} tint="tint-orange" />
             <StatCard label="Active incidents" value={String(incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status)).length)} delta="Operational issues" icon={<SupportAgentRounded />} tint="tint-green" />
           </Box>
-          <Box className="dashboard-grid"><Paper className="content-card requests-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Recent requests</Typography><Typography className="section-note">Requests submitted during this session</Typography></Box><Button endIcon={<KeyboardArrowRightRounded />} onClick={() => setActive('My requests')}>View all</Button></Box><RequestTable requests={requests.slice(0, 3)} compact /></Paper>
+          <Box className="dashboard-grid"><Paper className="content-card requests-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Recent requests</Typography><Typography className="section-note">Requests submitted during this session</Typography></Box><Button endIcon={<KeyboardArrowRightRounded />} onClick={() => setActive('Requests')}>View all</Button></Box><RequestTable requests={requests.slice(0, 3)} compact /></Paper>
             {user.role === 'MANAGER_ADMIN' && <Paper className="content-card approval-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Needs your attention</Typography><Typography className="section-note">Requests awaiting your approval</Typography></Box><Chip size="small" label={`${approvals.length} pending`} color="warning" variant="outlined" /></Box>{approvals.slice(0,3).map((approval) => <Box className="approval-item" key={approval.id}><Typography className="approval-title">{approval.requestNumber} · {approval.title}</Typography><Button size="small" onClick={() => setActive('Approvals')}>Review</Button></Box>)}{approvals.length === 0 && <Typography color="text.secondary" sx={{ py: 2 }}>No pending approvals.</Typography>}</Paper>}
           </Box>
           <Box className="section-heading catalog-heading"><Box><Typography variant="h6">Quick access</Typography><Typography className="section-note">Start with one of the most requested services.</Typography></Box><Button endIcon={<KeyboardArrowRightRounded />} onClick={() => setActive('Service catalog')}>Browse catalog</Button></Box>
@@ -2371,20 +2727,46 @@ function RequestDetailReport({
         <Box className="sn-form-column">
           <Box className="sn-field-row">
             <Typography className="sn-field-label">Number</Typography>
-            <Box className="sn-field-input-wrap sn-number-wrap">
+            <Box className="sn-field-input-wrap sn-number-wrap sn-reference-field-wrap">
               <input className="sn-input-styled sn-number-input" readOnly value={displayReqNumber} />
-              <InfoOutlined className="sn-info-badge" titleAccess="System Request ID" />
+              <Box className="sn-ref-actions">
+                <IconButton
+                  size="small"
+                  className="sn-ref-btn"
+                  title="System Request ID"
+                  aria-label="System Request ID"
+                  onClick={() => setToast(`Request ID: ${displayReqNumber}`)}
+                >
+                  <InfoOutlined fontSize="small" />
+                </IconButton>
+              </Box>
             </Box>
           </Box>
 
           <Box className="sn-field-row">
             <Typography className="sn-field-label">Requested for</Typography>
-            <Box className="sn-field-input-wrap">
+            <Box className="sn-field-input-wrap sn-reference-field-wrap">
               <input className="sn-input-styled" readOnly value={requestedForName} />
-              <IconButton size="small" className="sn-search-icon-btn" title="Look up user">
-                <SearchRounded fontSize="small" />
-              </IconButton>
-              <InfoOutlined className="sn-info-badge" titleAccess="Requester details" />
+              <Box className="sn-ref-actions">
+                <IconButton
+                  size="small"
+                  className="sn-ref-btn"
+                  title="Look up user"
+                  aria-label="Look up user"
+                  onClick={() => setToast(`User: ${requestedForName}`)}
+                >
+                  <SearchRounded fontSize="small" />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  className="sn-ref-btn"
+                  title="Requester details"
+                  aria-label="Requester details"
+                  onClick={() => setToast(`Profile details: ${requestedForName}`)}
+                >
+                  <InfoOutlined fontSize="small" />
+                </IconButton>
+              </Box>
             </Box>
           </Box>
 
@@ -2425,12 +2807,28 @@ function RequestDetailReport({
 
           <Box className="sn-field-row">
             <Typography className="sn-field-label">Opened by</Typography>
-            <Box className="sn-field-input-wrap">
+            <Box className="sn-field-input-wrap sn-reference-field-wrap">
               <input className="sn-input-styled" readOnly value={requesterName} />
-              <IconButton size="small" className="sn-search-icon-btn" title="Look up user">
-                <SearchRounded fontSize="small" />
-              </IconButton>
-              <InfoOutlined className="sn-info-badge" titleAccess="Opened by details" />
+              <Box className="sn-ref-actions">
+                <IconButton
+                  size="small"
+                  className="sn-ref-btn"
+                  title="Look up user"
+                  aria-label="Look up user"
+                  onClick={() => setToast(`User: ${requesterName}`)}
+                >
+                  <SearchRounded fontSize="small" />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  className="sn-ref-btn"
+                  title="Opened by details"
+                  aria-label="Opened by details"
+                  onClick={() => setToast(`Profile details: ${requesterName}`)}
+                >
+                  <InfoOutlined fontSize="small" />
+                </IconButton>
+              </Box>
             </Box>
           </Box>
 
@@ -3006,7 +3404,7 @@ function RequestReceipt({ receipt, onRequests, onCatalog }: { receipt: RequestRe
     <Typography className="receipt-section-title">Request details</Typography>
     <Box className="receipt-details">{receipt.details.map((item) => <Box className="receipt-detail" key={item.label}><Typography>{item.label}</Typography><Typography>{item.value}</Typography></Box>)}</Box>
     <Box className="form-notice"><SupportAgentRounded /><Typography>The approver’s name is recorded on this receipt, but approval notifications and approval routing are not active yet.</Typography></Box>
-    <Box className="form-actions"><Button onClick={onCatalog}>Create another request</Button><Button variant="contained" onClick={onRequests}>My requests</Button></Box>
+    <Box className="form-actions"><Button onClick={onCatalog}>Create another request</Button><Button variant="contained" onClick={onRequests}>Requests</Button></Box>
   </Paper>
 }
 
