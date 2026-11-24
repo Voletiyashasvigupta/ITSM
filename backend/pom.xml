@@ -13,6 +13,7 @@
     <module>request-service</module>
     <module>incident-service</module>
     <module>servicenow-integration</module>
+    <module>problem-service</module>
   </modules>
   <properties>
     <java.version>25</java.version>
