@@ -34,6 +34,7 @@ export type AdminDashboardProps = {
   pendingApprovalsCount?: number
   openIncidentsCount?: number
   p1IncidentsCount?: number
+  problemsCount?: number
   incidentsList?: Array<{
     id: string
     incidentNumber?: string
@@ -132,6 +133,7 @@ export default function SharedAdminDashboard({
   pendingApprovalsCount = 0,
   openIncidentsCount: _openIncidentsCount,
   p1IncidentsCount = 0,
+  problemsCount: customProblemsCount,
   incidentsList = [],
   requestsList = [],
   onNavigate,
@@ -220,8 +222,11 @@ export default function SharedAdminDashboard({
     }).length
   }, [openRequests, now])
 
-  // 6. Problems (High impact system or P1/P2 issues)
+  // 6. Problems (High impact system or P1/P2 issues or live problem-service count)
   const problemsCount = useMemo(() => {
+    if (customProblemsCount !== undefined) {
+      return customProblemsCount
+    }
     const highUrgency = openIncidents.filter(
       (i) =>
         i.priority?.includes('1') ||
@@ -1043,7 +1048,7 @@ export default function SharedAdminDashboard({
         <Paper
           className="sn-widget-card"
           elevation={0}
-          onClick={() => onNavigate?.('Incidents')}
+          onClick={() => onNavigate?.('Problems')}
           sx={{
             p: 2,
             border: '1px solid #dfe7eb',

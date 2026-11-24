@@ -5,8 +5,8 @@ spring:
     name: auth-service
   datasource:
     url: ${MYSQL_URL:jdbc:mysql://localhost:3306/northstar_auth?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
-    username: ${MYSQL_USER:northstar}
-    password: ${MYSQL_PASSWORD:local-only-change-me}
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
   jpa:
     hibernate:
       ddl-auto: update
@@ -14,15 +14,18 @@ spring:
   jackson:
     default-property-inclusion: non_null
 security:
+  auth:
+    auto-activate-registration: ${AUTO_ACTIVATE_REGISTRATION:true}
   jwt:
-    secret: ${JWT_SIGNING_SECRET:}
+    secret: ${JWT_SIGNING_SECRET:lrsOqxVRR53Tv6VUOZ4ZRW4G4mI5FlU0ODDQUvua6o-lcBbdH_2zuzTbzhg5mDik}
     issuer: ${JWT_ISSUER_URI:northstar-auth}
     audience: ${JWT_AUDIENCE:northstar-portal}
     ttl-minutes: ${JWT_TTL_MINUTES:60}
 bootstrap:
+  seed-default-users: ${BOOTSTRAP_SEED_DEFAULT_USERS:true}
   admin:
-    email: ${BOOTSTRAP_ADMIN_EMAIL:}
-    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+    email: ${BOOTSTRAP_ADMIN_EMAIL:admin@northstar.local}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:NorthstarLocal2026!}
     full-name: ${BOOTSTRAP_ADMIN_NAME:Northstar Administrator}
 eureka:
   client:

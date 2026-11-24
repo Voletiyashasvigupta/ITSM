@@ -40,17 +40,20 @@ public class AuthService {
     private final String issuer;
     private final String audience;
     private final long ttlMinutes;
+    private final boolean autoActivateRegistration;
 
     public AuthService(PortalUserRepository users, PasswordEncoder passwords, JwtEncoder jwtEncoder,
             @Value("${security.jwt.issuer}") String issuer,
             @Value("${security.jwt.audience}") String audience,
-            @Value("${security.jwt.ttl-minutes:60}") long ttlMinutes) {
+            @Value("${security.jwt.ttl-minutes:60}") long ttlMinutes,
+            @Value("${security.auth.auto-activate-registration:true}") boolean autoActivateRegistration) {
         this.users = users;
         this.passwords = passwords;
         this.jwtEncoder = jwtEncoder;
         this.issuer = issuer;
         this.audience = audience;
         this.ttlMinutes = ttlMinutes;
+        this.autoActivateRegistration = autoActivateRegistration;
     }
 
     @Transactional
@@ -59,8 +62,15 @@ public class AuthService {
         validatePasswordBytes(input.password());
         if (users.existsByEmail(email)) throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists");
         try {
-            PortalUser user = users.save(new PortalUser(input.fullName().trim(), email, passwords.encode(input.password()), null, false));
-            return new RegistrationResponse(user.getId(), user.getFullName(), user.getEmail(), "PENDING_ROLE_ASSIGNMENT", user.getCreatedAt());
+            PortalRole role = autoActivateRegistration ? PortalRole.EMPLOYEE : null;
+            boolean active = autoActivateRegistration;
+            PortalUser user = new PortalUser(input.fullName().trim(), email, passwords.encode(input.password()), role, active);
+            if (autoActivateRegistration) {
+                user.setDepartment(com.northstar.auth.entity.EmployeeDepartment.IT);
+            }
+            user = users.save(user);
+            String status = autoActivateRegistration ? "ACTIVE" : "PENDING_ROLE_ASSIGNMENT";
+            return new RegistrationResponse(user.getId(), user.getFullName(), user.getEmail(), status, user.getCreatedAt());
         } catch (DataIntegrityViolationException race) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists");
         }

@@ -20,7 +20,7 @@ spring:
     publisher-returns: true
 security:
   jwt:
-    secret: ${JWT_SIGNING_SECRET:}
+    secret: ${JWT_SIGNING_SECRET:lrsOqxVRR53Tv6VUOZ4ZRW4G4mI5FlU0ODDQUvua6o-lcBbdH_2zuzTbzhg5mDik}
     issuer: ${JWT_ISSUER_URI:northstar-auth}
     audience: ${JWT_AUDIENCE:northstar-portal}
 eureka:
