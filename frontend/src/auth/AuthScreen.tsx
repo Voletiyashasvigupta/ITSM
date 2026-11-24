@@ -71,47 +71,21 @@ export default function AuthScreen() {
       <TextField required fullWidth label="Password" type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} slotProps={{ htmlInput: { minLength: mode === 'register' ? 12 : undefined, maxLength: 72 } }} value={password} onChange={(event) => setPassword(event.target.value)} helperText={mode === 'register' ? 'Use at least 12 characters.' : undefined} sx={{ mb: 2.5 }} />
       <Button type="submit" fullWidth variant="contained" size="large" disabled={busy}>{busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}</Button>
       {mode === 'login' && (
-        <Box sx={{ mt: 2, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px dashed #cbd5e1', textAlign: 'center' }}>
-          <Typography variant="caption" sx={{ color: '#334155', display: 'block', mb: 1, fontWeight: 700 }}>
-            Quick Demo / Test Credentials (Password: <code>NorthstarLocal2026!</code>)
+        <Box sx={{ mt: 2, p: 1.5, bgcolor: '#f8fafc', borderRadius: 2, border: '1px dashed #cbd5e1', textAlign: 'center' }}>
+          <Typography variant="caption" sx={{ color: '#475569', display: 'block', mb: 0.75, fontWeight: 600 }}>
+            Quick Admin & Manager Login:
           </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => {
-                setEmail('admin@northstar.local')
-                setPassword('NorthstarLocal2026!')
-              }}
-              sx={{ textTransform: 'none', fontWeight: 600, fontSize: 11, py: 0.5 }}
-            >
-              Admin / Manager
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              color="primary"
-              onClick={() => {
-                setEmail('employee@northstar.local')
-                setPassword('NorthstarLocal2026!')
-              }}
-              sx={{ textTransform: 'none', fontWeight: 600, fontSize: 11, py: 0.5 }}
-            >
-              Standard Employee
-            </Button>
-            <Button
-              size="small"
-              variant="outlined"
-              color="success"
-              onClick={() => {
-                setEmail('analyst@northstar.local')
-                setPassword('NorthstarLocal2026!')
-              }}
-              sx={{ textTransform: 'none', fontWeight: 600, fontSize: 11, py: 0.5 }}
-            >
-              Problem Analyst
-            </Button>
-          </Box>
+          <Button
+            size="small"
+            variant="outlined"
+            fullWidth
+            onClick={() => {
+              setEmail('admin@northstar.local')
+              setPassword('NorthstarLocal2026!')
+            }}
+          >
+            Fill Admin Credentials (admin@northstar.local)
+          </Button>
         </Box>
       )}
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2 }}>Portal accounts are separate from ServiceNow credentials.</Typography>
