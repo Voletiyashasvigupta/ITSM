@@ -1,0 +1,1 @@
+package com.itsm.changemanagement.dto; import jakarta.validation.constraints.*; import com.itsm.changemanagement.entity.ValidationStatus; public record ChangeScheduleDTO(@NotBlank String plannedStartDate,@NotBlank String plannedEndDate,String maintenanceWindow,@NotBlank String scheduledBy) {}

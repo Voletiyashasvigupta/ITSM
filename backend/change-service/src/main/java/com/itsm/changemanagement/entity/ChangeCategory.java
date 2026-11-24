@@ -1,0 +1,1 @@
+package com.itsm.changemanagement.entity; public enum ChangeCategory { SOFTWARE,HARDWARE,NETWORK,DATABASE,SECURITY,INFRASTRUCTURE,APPLICATION,OTHER }

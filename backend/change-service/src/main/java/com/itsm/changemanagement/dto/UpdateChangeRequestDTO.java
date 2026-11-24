@@ -1,0 +1,1 @@
+package com.itsm.changemanagement.dto; import jakarta.validation.constraints.*; import com.itsm.changemanagement.entity.ValidationStatus; public record UpdateChangeRequestDTO(String shortDescription,String detailedDescription,String businessJustification,String implementationPlan,String rollbackPlan,String testPlan) {}

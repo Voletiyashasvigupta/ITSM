@@ -1,0 +1,1868 @@
+{
+  "info": {
+    "_postman_id": "a3e83d2b-90d8-4d56-a123-1e0c0f0d8091",
+    "name": "Change Management Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Core lifecycle and customization APIs. Run requests in the documented lifecycle order."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8091"
+    },
+    {
+      "key": "changeId",
+      "value": ""
+    },
+    {
+      "key": "meetingId",
+      "value": ""
+    },
+    {
+      "key": "changeNumber",
+      "value": ""
+    },
+    {
+      "key": "customFieldId",
+      "value": ""
+    },
+    {
+      "key": "configId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Create change",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"shortDescription\": \"Upgrade application server\",\n  \"detailedDescription\": \"Upgrade application server to approved release\",\n  \"requestedBy\": \"Sravanthi\",\n  \"requesterEmail\": \"sravanthi@example.com\",\n  \"department\": \"IT\",\n  \"changeType\": \"NORMAL\",\n  \"category\": \"APPLICATION\",\n  \"priority\": \"MEDIUM\",\n  \"riskLevel\": \"MEDIUM\",\n  \"impact\": \"Brief application restart\",\n  \"affectedCi\": \"APP-SERVER-01\",\n  \"businessJustification\": \"Security and performance updates\",\n  \"implementationPlan\": \"Deploy during maintenance window\",\n  \"rollbackPlan\": \"Restore previous release\",\n  \"testPlan\": \"Smoke and regression tests\",\n  \"plannedStartDate\": \"2026-12-01T22:00:00\",\n  \"plannedEndDate\": \"2026-12-01T23:00:00\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if(pm.response.code===201){const x=pm.response.json();pm.environment.set(\"changeId\",x.id);pm.environment.set(\"changeNumber\",x.changeNumber);}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List changes",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes?page=0&size=20&sort=createdAt,desc",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes?page=0&size=20&sort=createdAt,desc"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get change",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update draft",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"shortDescription\": \"Upgrade application server - revised\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Submit change",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/submit",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "submit"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"performedBy\": \"requester\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Start assessment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/start-assessment",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "start-assessment"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"performedBy\": \"analyst\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Complete assessment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/assess",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "assess"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"riskDescription\": \"Moderate deployment risk\",\n  \"businessImpact\": \"Short planned interruption\",\n  \"technicalImpact\": \"Application service restart\",\n  \"serviceDowntimeExpected\": true,\n  \"riskMitigationPlan\": \"Backup and rollback package\",\n  \"performedBy\": \"analyst\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Assign change",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/assign",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "assign"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"changeAnalyst\": \"analyst@example.com\",\n  \"technicalTeam\": \"Platform Engineering\",\n  \"implementationTeam\": \"Release Team\",\n  \"changeManager\": \"manager@example.com\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Review change",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/review",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "review"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reviewer\": \"reviewer@example.com\",\n  \"comments\": \"Plan and rollback reviewed\",\n  \"decision\": \"APPROVED\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Approve change",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/approve",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "approve"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"approvedBy\": \"manager@example.com\",\n  \"comments\": \"Approved for CAB policy\",\n  \"justification\": \"Emergency justification only for emergency changes\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Schedule change",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/schedule",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "schedule"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"plannedStartDate\": \"2026-12-01T22:00:00\",\n  \"plannedEndDate\": \"2026-12-01T23:00:00\",\n  \"maintenanceWindow\": \"Tuesday 22:00-23:00\",\n  \"scheduledBy\": \"manager@example.com\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Start implementation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/start-implementation",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "start-implementation"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"performedBy\": \"release-team\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Update implementation progress",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/implementation-progress",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "implementation-progress"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"progress\": 65,\n  \"notes\": \"Deployment completed; smoke tests running\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Complete implementation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/complete-implementation",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "complete-implementation"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"outcome\": \"SUCCESS\",\n  \"notes\": \"Release deployed\",\n  \"performedBy\": \"release-team\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Submit test results",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/test-results",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "test-results"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"testResults\": \"Smoke tests passed\",\n  \"validationStatus\": \"PASSED\",\n  \"testerName\": \"qa@example.com\",\n  \"comments\": \"Critical user journeys verified\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Close change",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/close",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "close"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"closureNotes\": \"Implementation and validation complete\",\n  \"closedBy\": \"manager@example.com\",\n  \"finalOutcome\": \"SUCCESS\",\n  \"postImplementationReview\": \"No incidents observed\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "My changes",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/my-changes?email=sravanthi@example.com",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "my-changes?email=sravanthi@example.com"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Filter by status",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/status/CLOSED",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "status",
+            "CLOSED"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Filter by type",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/type/NORMAL",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "type",
+            "NORMAL"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Assessment details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/assessment",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "assessment"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Assignments",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/assignments",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "assignments"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Approvals",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/approvals",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "approvals"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Schedule details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/schedule",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "schedule"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Test results",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/test-results",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "test-results"
+          ]
+        }
+      }
+    },
+    {
+      "name": "History",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/history",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "history"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Dashboard summary",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/dashboard/summary",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "dashboard",
+            "summary"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Request more information",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/request-information",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "request-information"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reviewer\": \"reviewer@example.com\",\n  \"comments\": \"Please attach test evidence\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Reject pending approval",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/reject",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "reject"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"approvedBy\": \"manager@example.com\",\n  \"comments\": \"Risk is not acceptable\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Start rollback",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/rollback",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "rollback"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Post-deployment errors\",\n  \"notes\": \"Restoring previous version\",\n  \"performedBy\": \"release-team\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Complete rollback",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/rollback/complete",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "rollback",
+            "complete"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"COMPLETED\",\n  \"notes\": \"Previous version restored\",\n  \"performedBy\": \"release-team\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Cancel change",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/changes/{{changeId}}/cancel",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "changes",
+            "{{changeId}}",
+            "cancel"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Business requirement withdrawn\",\n  \"cancelledBy\": \"manager@example.com\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Create CAB meeting",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/cab/meetings",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "cab",
+            "meetings"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"key\": \"CAB-2026-12-01\",\n  \"name\": \"Weekly CAB\",\n  \"meetingDate\": \"2026-12-01T10:00:00\",\n  \"chair\": \"cab-chair@example.com\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if(pm.response.code===201){pm.environment.set(\"meetingId\",pm.response.json().id);}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List CAB meetings",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/cab/meetings",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "cab",
+            "meetings"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Add CAB member",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/cab/meetings/{{meetingId}}/members",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "cab",
+            "meetings",
+            "{{meetingId}}",
+            "members"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"memberName\": \"CAB Member\",\n  \"email\": \"cab@example.com\",\n  \"role\": \"CAB_MEMBER\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Add change to CAB agenda",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/cab/meetings/{{meetingId}}/changes/{{changeId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "cab",
+            "meetings",
+            "{{meetingId}}",
+            "changes",
+            "{{changeId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"agendaItem\": \"Review application upgrade\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Record CAB decision",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/cab/meetings/{{meetingId}}/changes/{{changeId}}/decision",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "cab",
+            "meetings",
+            "{{meetingId}}",
+            "changes",
+            "{{changeId}}",
+            "decision"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"decision\": \"APPROVED\",\n  \"approvalComments\": \"Approved by CAB\",\n  \"approvedBy\": \"cab-chair@example.com\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Create custom-fields",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-fields",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-fields"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fieldLabel\": \"Business service\",\n  \"fieldKey\": \"business_service\",\n  \"fieldType\": \"DROPDOWN\",\n  \"required\": true,\n  \"options\": [\n    \"Payments\",\n    \"Identity\",\n    \"Portal\"\n  ],\n  \"active\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if(pm.response.code===201){pm.environment.set(\"customFieldId\",pm.response.json().id);}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List custom-fields",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-fields",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-fields"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create custom-forms",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-forms",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-forms"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Normal Change Form\",\n  \"applicableChangeType\": \"NORMAL\",\n  \"sections\": [\n    {\n      \"name\": \"General\",\n      \"fields\": [\n        \"shortDescription\",\n        \"businessJustification\",\n        \"business_service\"\n      ]\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if(pm.response.code===201){pm.environment.set(\"configId\",pm.response.json().id);}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List custom-forms",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-forms",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-forms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create custom-workflows",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-workflows",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-workflows"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Normal workflow\",\n  \"applicableChangeType\": \"NORMAL\",\n  \"initialStatus\": \"DRAFT\",\n  \"steps\": [\n    {\n      \"name\": \"Submit\",\n      \"status\": \"SUBMITTED\"\n    },\n    {\n      \"name\": \"Assessment\",\n      \"status\": \"ASSESSMENT\"\n    }\n  ],\n  \"active\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if(pm.response.code===201){pm.environment.set(\"configId\",pm.response.json().id);}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List custom-workflows",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-workflows",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-workflows"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create approval-rules",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/approval-rules",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "approval-rules"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"High risk CAB rule\",\n  \"conditions\": [\n    {\n      \"field\": \"riskLevel\",\n      \"operator\": \"EQUALS\",\n      \"value\": \"HIGH\"\n    }\n  ],\n  \"approvalLevels\": [\n    \"CHANGE_MANAGER\",\n    \"CAB\"\n  ],\n  \"active\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if(pm.response.code===201){pm.environment.set(\"configId\",pm.response.json().id);}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List approval-rules",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/approval-rules",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "approval-rules"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create change-categories",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/change-categories",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "change-categories"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Cloud Infrastructure Change\",\n  \"description\": \"Cloud platform changes\",\n  \"defaultRiskLevel\": \"MEDIUM\",\n  \"active\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if(pm.response.code===201){pm.environment.set(\"configId\",pm.response.json().id);}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List change-categories",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/change-categories",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "change-categories"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Create notifications",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "notifications"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Change approved email\",\n  \"event\": \"CHANGE_APPROVED\",\n  \"subject\": \"Change {{changeNumber}} approved\",\n  \"body\": \"{{changeTitle}} is approved\",\n  \"recipientType\": \"REQUESTER\",\n  \"channel\": \"EMAIL\",\n  \"active\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if(pm.response.code===201){pm.environment.set(\"configId\",pm.response.json().id);}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List notifications",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/notifications",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "notifications"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get custom field",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-fields/{{customFieldId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-fields",
+            "{{customFieldId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update custom field",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-fields/{{customFieldId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-fields",
+            "{{customFieldId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fieldLabel\": \"Business service\",\n  \"fieldKey\": \"business_service\",\n  \"fieldType\": \"DROPDOWN\",\n  \"required\": false,\n  \"options\": [\n    \"Payments\",\n    \"Identity\",\n    \"Portal\"\n  ],\n  \"active\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Delete/deactivate custom field",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-fields/{{customFieldId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-fields",
+            "{{customFieldId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "List active custom fields",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-fields/active",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-fields",
+            "active"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get form",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-forms/{{configId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-forms",
+            "{{configId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Preview form",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-forms/{{configId}}/preview",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-forms",
+            "{{configId}}",
+            "preview"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update form",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-forms/{{configId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-forms",
+            "{{configId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Normal Change Form v2\",\n  \"sections\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Delete form",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-forms/{{configId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-forms",
+            "{{configId}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Activate workflow",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-workflows/{{configId}}/activate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-workflows",
+            "{{configId}}",
+            "activate"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Deactivate workflow",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-workflows/{{configId}}/deactivate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-workflows",
+            "{{configId}}",
+            "deactivate"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Activate approval rule",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/approval-rules/{{configId}}/activate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "approval-rules",
+            "{{configId}}",
+            "activate"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Update workflow/rule/category/notification",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/custom-workflows/{{configId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "custom-workflows",
+            "{{configId}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Updated config\",\n  \"steps\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Delete workflow/rule/category/notification",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/approval-rules/{{configId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "approval-rules",
+            "{{configId}}"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -39,6 +39,12 @@ spring:
             - id: problem-service
               uri: lb://PROBLEM-SERVICE
               predicates: [Path=/api/problems/**]
+            - id: change-service
+              uri: lb://CHANGE-SERVICE
+              predicates: [Path=/api/changes/**]
+            - id: cab-service
+              uri: lb://CHANGE-SERVICE
+              predicates: [Path=/api/cab/**]
           globalcors:
             cors-configurations:
               '[/**]':

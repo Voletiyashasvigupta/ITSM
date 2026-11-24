@@ -1,0 +1,1 @@
+package com.itsm.changemanagement.dto; import jakarta.validation.constraints.*; import com.itsm.changemanagement.entity.ValidationStatus; public record ChangeAssessmentDTO(String riskDescription,String businessImpact,String technicalImpact,Boolean serviceDowntimeExpected,String riskMitigationPlan,String performedBy) {}

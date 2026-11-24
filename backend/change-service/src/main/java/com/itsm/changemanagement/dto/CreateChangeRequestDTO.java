@@ -1,0 +1,3 @@
+package com.itsm.changemanagement.dto;
+import com.itsm.changemanagement.entity.*;import jakarta.validation.constraints.*;import java.time.LocalDateTime;
+public record CreateChangeRequestDTO(@NotBlank @Size(max=180) String shortDescription,@NotBlank String detailedDescription,@NotBlank String requestedBy,@NotBlank @Email String requesterEmail,@NotBlank String department,@NotNull ChangeType changeType,@NotNull ChangeCategory category,@NotNull Priority priority,@NotNull RiskLevel riskLevel,String impact,String affectedCi,String businessJustification,String implementationPlan,String rollbackPlan,String testPlan,@FutureOrPresent LocalDateTime plannedStartDate,LocalDateTime plannedEndDate,String customValues) {}

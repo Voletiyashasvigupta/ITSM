@@ -61,6 +61,8 @@ import PasswordSettings from './auth/PasswordSettings'
 import UserAccessPage from './auth/UserAccessPage'
 import ProblemManagement, { type ProblemRecord } from './problems/ProblemManagement'
 import ReportProblemRounded from '@mui/icons-material/ReportProblemRounded'
+import ChangeManagement from './changes/ChangeManagement'
+import PublishedWithChangesRounded from '@mui/icons-material/PublishedWithChangesRounded'
 import { useAuth } from './auth/AuthContext'
 import type { PortalUser } from './auth/AuthContext'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -262,6 +264,7 @@ const managementNav = [
 ]
 const incidentNav = { label: 'Incidents', icon: <SupportAgentRounded /> }
 const problemNav = { label: 'Problems', icon: <ReportProblemRounded /> }
+const changeNav = { label: 'Changes', icon: <PublishedWithChangesRounded /> }
 
 function statusTone(status: Request['status']) { return status === 'Completed' ? 'success' : status === 'Awaiting approval' || status === 'Pending sync' ? 'warning' : 'info' }
 
@@ -282,6 +285,7 @@ export default function App() {
   const [incidentDetail, setIncidentDetail] = useState<IncidentDetailRecord | null>(null)
   const [problems, setProblems] = useState<ProblemRecord[]>([])
   const [selectedProblem] = useState<ProblemRecord | null>(null)
+  const [changesCount, setChangesCount] = useState<number>(0)
   const [incidentComment, setIncidentComment] = useState('')
   const [incidentFormOpen, setIncidentFormOpen] = useState(false)
   const [incidentForm, setIncidentForm] = useState(initialIncidentForm)
@@ -436,6 +440,8 @@ export default function App() {
     '/incidents': 'Incidents',
     '/problems': 'Problems',
     '/manage/problems': 'Problems',
+    '/changes': 'Changes',
+    '/manage/changes': 'Changes',
     '/access': 'User access',
     '/settings': 'Settings',
     '/requests/receipt': 'Request receipt',
@@ -450,6 +456,7 @@ export default function App() {
     'Approvals': '/approvals',
     'Incidents': '/incidents',
     'Problems': isManagerAdmin ? '/manage/problems' : '/problems',
+    'Changes': isManagerAdmin ? '/manage/changes' : '/changes',
     'User access': '/access',
     'Settings': '/settings',
     'Request receipt': '/requests/receipt',
@@ -570,6 +577,12 @@ export default function App() {
         const problemData = await problemResponse.json() as ProblemRecord[]
         setProblems(problemData)
       }
+      void apiFetch('/api/changes/dashboard/summary').then(async (res) => {
+        if (res.ok) {
+          const stats = await res.json()
+          setChangesCount(stats.totalChanges ?? 0)
+        }
+      }).catch(() => {})
       setRequests((requestPage.content ?? []).map((r) => ({ backendId: r.id, id: r.requestNumber, title: r.serviceName, category: 'Service request', status: r.status.replaceAll('_', ' '), date: new Date(r.createdAt).toLocaleDateString(), createdAt: r.createdAt, color: 'amber', description: r.description })))
       setApprovals(approvalData.filter((a) => a.decision === 'PENDING').map((a) => ({ id: a.id, requestId: a.requestId, requestNumber: a.requestNumber, title: a.serviceName, employee: a.requesterId, initials: a.requesterId.slice(0, 2).toUpperCase(), requested: new Date(a.createdAt).toLocaleDateString() })))
       setIncidentRows(incidentData)
@@ -1099,6 +1112,7 @@ export default function App() {
         </ListItemButton>)}
         <ListItemButton selected={active === incidentNav.label} onClick={() => { setSelectedService(null); setActive(incidentNav.label) }} className="nav-item"><ListItemIcon>{incidentNav.icon}</ListItemIcon><ListItemText primary={incidentNav.label} /></ListItemButton>
         <ListItemButton selected={active === problemNav.label} onClick={() => { setSelectedService(null); setActive(problemNav.label) }} className="nav-item"><ListItemIcon>{problemNav.icon}</ListItemIcon><ListItemText primary={problemNav.label} /></ListItemButton>
+        <ListItemButton selected={active === changeNav.label} onClick={() => { setSelectedService(null); setActive(changeNav.label) }} className="nav-item"><ListItemIcon>{changeNav.icon}</ListItemIcon><ListItemText primary={changeNav.label} /></ListItemButton>
       </List>
       {isManagerAdmin && <><Box className="workspace-label management-label">MANAGEMENT</Box><List className="nav-list" disablePadding>
         {[
@@ -1490,7 +1504,7 @@ export default function App() {
             onRefreshWorkspace={loadWorkspace}
             onAddItem={() => setActive('Service catalog')}
           />
-        ) : selectedService ? <ServiceRequestForm service={selectedService} values={requestFields} setValues={setRequestFields} approvers={approvers} approversLoading={approversLoading} busy={busy} onCancel={() => { setSelectedService(null); setRequestFields({}) }} onSubmit={() => void submitRequest(selectedService)} /> : active === 'Request receipt' && receipt ? <RequestReceipt receipt={receipt} onRequests={() => setActive('Requests')} onCatalog={() => setActive('Service catalog')} /> : active === 'Settings' ? <PasswordSettings onNavigate={(page) => setActive(page)} setToast={setToast} /> : active === 'User access' && isManagerAdmin ? <UserAccessPage /> : (active === 'Admin dashboard' || (isManagerAdmin && (active === 'Overview' || active === 'Dashboard'))) ? <SharedAdminDashboard requestsCount={requests.length} pendingApprovalsCount={approvals.length} openIncidentsCount={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status)).length} p1IncidentsCount={incidentRows.filter((i) => i.priority?.includes('1') || i.priority?.toLowerCase().includes('critical')).length} problemsCount={problems.filter((p) => !['RESOLVED', 'CLOSED'].includes(p.status?.toUpperCase() || '')).length} incidentsList={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status))} requestsList={requests} onNavigate={(page) => setActive(page)} onRefresh={loadWorkspace} onOpenIncident={openIncident} onOpenRequest={openRequest} onBack={handleGlobalBack} setToast={setToast} /> : active === 'Incidents' ? (
+        ) : selectedService ? <ServiceRequestForm service={selectedService} values={requestFields} setValues={setRequestFields} approvers={approvers} approversLoading={approversLoading} busy={busy} onCancel={() => { setSelectedService(null); setRequestFields({}) }} onSubmit={() => void submitRequest(selectedService)} /> : active === 'Request receipt' && receipt ? <RequestReceipt receipt={receipt} onRequests={() => setActive('Requests')} onCatalog={() => setActive('Service catalog')} /> : active === 'Settings' ? <PasswordSettings onNavigate={(page) => setActive(page)} setToast={setToast} /> : active === 'User access' && isManagerAdmin ? <UserAccessPage /> : (active === 'Admin dashboard' || (isManagerAdmin && (active === 'Overview' || active === 'Dashboard'))) ? <SharedAdminDashboard requestsCount={requests.length} pendingApprovalsCount={approvals.length} openIncidentsCount={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status)).length} p1IncidentsCount={incidentRows.filter((i) => i.priority?.includes('1') || i.priority?.toLowerCase().includes('critical')).length} problemsCount={problems.filter((p) => !['RESOLVED', 'CLOSED'].includes(p.status?.toUpperCase() || '')).length} changesCount={changesCount} incidentsList={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status))} requestsList={requests} onNavigate={(page) => setActive(page)} onRefresh={loadWorkspace} onOpenIncident={openIncident} onOpenRequest={openRequest} onBack={handleGlobalBack} setToast={setToast} /> : active === 'Incidents' ? (
           <Paper className="content-card">
             <Box className="section-heading in-card">
               <Box>
@@ -2041,6 +2055,14 @@ export default function App() {
             apiFetch={apiFetch}
             setToast={setToast}
             initialSelectedProblem={selectedProblem}
+          />
+        ) : active === 'Changes' ? (
+          <ChangeManagement
+            isManagerAdmin={isManagerAdmin}
+            currentUserEmail={user?.email}
+            currentUserName={user?.fullName}
+            apiFetch={apiFetch}
+            setToast={setToast}
           />
         ) : active === 'Service catalog' ? <>
           <Paper className="catalog-banner"><Box><Typography className="banner-kicker">SERVICE CATALOG</Typography><Typography variant="h5" className="banner-title">How can we help?</Typography><Typography className="banner-copy">Find the right service and we’ll take it from there.</Typography></Box><SupportAgentRounded className="banner-art" /></Paper>

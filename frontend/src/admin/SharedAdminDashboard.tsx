@@ -35,6 +35,7 @@ export type AdminDashboardProps = {
   openIncidentsCount?: number
   p1IncidentsCount?: number
   problemsCount?: number
+  changesCount?: number
   incidentsList?: Array<{
     id: string
     incidentNumber?: string
@@ -134,6 +135,7 @@ export default function SharedAdminDashboard({
   openIncidentsCount: _openIncidentsCount,
   p1IncidentsCount = 0,
   problemsCount: customProblemsCount,
+  changesCount: customChangesCount,
   incidentsList = [],
   requestsList = [],
   onNavigate,
@@ -261,6 +263,9 @@ export default function SharedAdminDashboard({
 
   // 9. Changes (Active change requests & device / access provisioning)
   const changesCount = useMemo(() => {
+    if (customChangesCount !== undefined) {
+      return customChangesCount
+    }
     const count = requestsList.filter(
       (r) =>
         r.category?.toLowerCase().includes('change') ||
@@ -1089,7 +1094,7 @@ export default function SharedAdminDashboard({
         <Paper
           className="sn-widget-card"
           elevation={0}
-          onClick={() => onNavigate?.('Requests')}
+          onClick={() => onNavigate?.('Changes')}
           sx={{
             p: 2,
             border: '1px solid #dfe7eb',

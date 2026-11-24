@@ -1,0 +1,1 @@
+package com.itsm.changemanagement.entity; public enum ValidationStatus { PENDING,PASSED,FAILED }
