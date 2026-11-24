@@ -4,9 +4,9 @@ spring:
   application:
     name: request-service
   datasource:
-    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/northstar_request_service?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
-    username: ${MYSQL_USER:northstar}
-    password: ${MYSQL_PASSWORD:}
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/northstar_request_service?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:root}
   jpa:
     hibernate:
       ddl-auto: validate
