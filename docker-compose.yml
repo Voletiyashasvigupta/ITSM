@@ -117,7 +117,7 @@ services:
     container_name: itsm-catalog-service
     restart: unless-stopped
     ports:
-      - "8081:8081"
+      - "${CATALOG_HOST_PORT:-18081}:8081"
     environment:
       PORT: 8081
       REDIS_HOST: redis
@@ -167,7 +167,7 @@ services:
     container_name: itsm-request-service
     restart: unless-stopped
     ports:
-      - "8082:8082"
+      - "${REQUEST_HOST_PORT:-18082}:8082"
     environment:
       PORT: 8082
       MYSQL_URL: jdbc:mysql://mysql:3306/northstar_request_service?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
