@@ -14,7 +14,6 @@ RUN mvn -B -pl ${MODULE} -am -DskipTests package
 FROM eclipse-temurin:25-jre
 ARG MODULE
 WORKDIR /app
-COPY --from=build /workspace/${MODULE}/target/${MODULE}-0.1.0-SNAPSHOT.jar app.jar
-USER 10001
-EXPOSE 7777
+COPY --from=build /workspace/${MODULE}/target/*.jar app.jar
+EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

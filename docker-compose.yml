@@ -1,0 +1,308 @@
+services:
+  # ============================================================================
+  # Infrastructure Services
+  # ============================================================================
+
+  mysql:
+    image: mysql:8.0
+    container_name: itsm-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    networks:
+      - itsm-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: itsm-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - itsm-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: itsm-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: northstar
+      RABBITMQ_DEFAULT_PASS: northstar
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - itsm-network
+
+  # ============================================================================
+  # Spring Cloud Eureka Service Registry
+  # ============================================================================
+
+  service-registry:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE: service-registry
+    container_name: itsm-service-registry
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    environment:
+      PORT: 8761
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8761/eureka/apps || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 25s
+    networks:
+      - itsm-network
+
+  # ============================================================================
+  # Business Microservices
+  # ============================================================================
+
+  auth-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE: auth-service
+    container_name: itsm-auth-service
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+    environment:
+      PORT: 8088
+      MYSQL_URL: jdbc:mysql://mysql:3306/northstar_auth?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      EUREKA_URL: http://service-registry:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      BOOTSTRAP_ADMIN_EMAIL: admin@northstar.local
+      BOOTSTRAP_ADMIN_PASSWORD: NorthstarLocal2026!
+      BOOTSTRAP_ADMIN_NAME: Northstar Administrator
+      JWT_SIGNING_SECRET: lrsOqxVRR53Tv6VUOZ4ZRW4G4mI5FlU0ODDQUvua6o-lcBbdH_2zuzTbzhg5mDik
+    depends_on:
+      mysql:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+    networks:
+      - itsm-network
+
+  catalog-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE: catalog-service
+    container_name: itsm-catalog-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      PORT: 8081
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      EUREKA_URL: http://service-registry:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+    depends_on:
+      redis:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+    networks:
+      - itsm-network
+
+  incident-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE: incident-service
+    container_name: itsm-incident-service
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      PORT: 8087
+      MYSQL_URL: jdbc:mysql://mysql:3306/northstar_incident_service?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      EUREKA_URL: http://service-registry:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      JWT_SIGNING_SECRET: lrsOqxVRR53Tv6VUOZ4ZRW4G4mI5FlU0ODDQUvua6o-lcBbdH_2zuzTbzhg5mDik
+    depends_on:
+      mysql:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+    networks:
+      - itsm-network
+
+  request-service:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE: request-service
+    container_name: itsm-request-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      PORT: 8082
+      MYSQL_URL: jdbc:mysql://mysql:3306/northstar_request_service?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: northstar
+      RABBITMQ_PASSWORD: northstar
+      EUREKA_URL: http://service-registry:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      JWT_SIGNING_SECRET: lrsOqxVRR53Tv6VUOZ4ZRW4G4mI5FlU0ODDQUvua6o-lcBbdH_2zuzTbzhg5mDik
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+    networks:
+      - itsm-network
+
+  problem-service:
+    build:
+      context: ./backend/problem-service
+      dockerfile: Dockerfile
+    container_name: itsm-problem-service
+    restart: unless-stopped
+    ports:
+      - "8089:8089"
+    environment:
+      PORT: 8089
+      MYSQL_URL: jdbc:mysql://mysql:3306/problem_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      EUREKA_URL: http://service-registry:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      JWT_SIGNING_SECRET: lrsOqxVRR53Tv6VUOZ4ZRW4G4mI5FlU0ODDQUvua6o-lcBbdH_2zuzTbzhg5mDik
+    depends_on:
+      mysql:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+    networks:
+      - itsm-network
+
+  change-service:
+    build:
+      context: ./backend/change-service
+      dockerfile: Dockerfile
+    container_name: itsm-change-service
+    restart: unless-stopped
+    ports:
+      - "8091:8091"
+    environment:
+      PORT: 8091
+      SERVER_PORT: 8091
+      MYSQL_URL: jdbc:mysql://mysql:3306/change_management?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_URL: jdbc:mysql://mysql:3306/change_management?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      OPEN_ACCESS: "true"
+      EUREKA_URL: http://service-registry:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      JWT_SIGNING_SECRET: lrsOqxVRR53Tv6VUOZ4ZRW4G4mI5FlU0ODDQUvua6o-lcBbdH_2zuzTbzhg5mDik
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173,http://localhost:80,http://localhost
+    depends_on:
+      mysql:
+        condition: service_healthy
+      service-registry:
+        condition: service_healthy
+    networks:
+      - itsm-network
+
+  # ============================================================================
+  # Spring Cloud API Gateway
+  # ============================================================================
+
+  api-gateway:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE: api-gateway
+    container_name: itsm-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "7777:8080"
+    environment:
+      PORT: 8080
+      EUREKA_URL: http://service-registry:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      JWT_SIGNING_SECRET: lrsOqxVRR53Tv6VUOZ4ZRW4G4mI5FlU0ODDQUvua6o-lcBbdH_2zuzTbzhg5mDik
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173,http://localhost:80,http://localhost
+    depends_on:
+      service-registry:
+        condition: service_healthy
+    networks:
+      - itsm-network
+
+  # ============================================================================
+  # Frontend Application (Nginx SPA + Reverse Proxy)
+  # ============================================================================
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: itsm-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+      - "80:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - itsm-network
+
+# ==============================================================================
+# Persistent Volumes & Network Definitions
+# ==============================================================================
+
+volumes:
+  mysql-data:
+    driver: local
+
+networks:
+  itsm-network:
+    driver: bridge
