@@ -4,6 +4,16 @@ import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * JPA entity representing an ITIL Incident ticket stored in the {@code incidents} table.
+ *
+ * <p><b>Purpose:</b> Models complete incident lifecycle data including incident numbers (INC001...),
+ * caller, category/subcategory, business service, channel, state, impact, urgency, matrix priority,
+ * assignment, and work descriptions. Supports backward compatibility with legacy title/status columns.
+ *
+ * <p><b>Downstream / Workflow:</b> Managed by {@link com.northstar.incident.repository.IncidentRepository} and
+ * updated by {@link com.northstar.incident.service.LocalIncidentService}. Displayed on the employee and support agent portals.
+ */
 @Entity
 @Table(name = "incidents")
 public class IncidentEntity {
@@ -77,8 +87,16 @@ public class IncidentEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** Protected no-arg constructor for JPA. */
     protected IncidentEntity() {}
 
+    /**
+     * Constructs a new IncidentEntity with full ITIL attributes and default fallback values.
+     *
+     * <p><b>Purpose:</b> Initializes a new incident record and synchronizes legacy compatibility fields.
+     *
+     * <p><b>Downstream / Workflow:</b> Called when creating an incident from {@link com.northstar.incident.dto.IncidentInput}.
+     */
     public IncidentEntity(String incidentNumber, String caller, String category, String subcategory,
                           String service, String serviceOffering,
                           String channel, String state, String impact, String urgency,
@@ -109,24 +127,58 @@ public class IncidentEntity {
         this.updatedAt = this.createdAt;
     }
 
+    /**
+     * Updates legacy status and state strings with timestamp refresh.
+     *
+     * <p><b>Purpose:</b> Transitions ticket status.
+     *
+     * <p><b>Downstream / Workflow:</b> Called by service layer status transition handlers.
+     *
+     * @param status New status string.
+     */
     public void updateStatus(String status) {
         this.status = status;
         this.state = status;
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * Updates state name and synchronizes uppercase status string.
+     *
+     * <p><b>Purpose:</b> ITIL state progression (e.g. New -> In Progress -> Resolved).
+     *
+     * <p><b>Downstream / Workflow:</b> Called during administrative updates.
+     *
+     * @param state New state label.
+     */
     public void updateState(String state) {
         this.state = state;
         this.status = state.toUpperCase().replace(" ", "_");
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * Assigns the incident to a support staff member.
+     *
+     * <p><b>Purpose:</b> Sets ticket owner.
+     *
+     * <p><b>Downstream / Workflow:</b> Refreshes assignee fields and updated_at timestamp.
+     *
+     * @param assigneeId Support staff identifier.
+     */
     public void addAssignee(String assigneeId) {
         this.assigneeId = assigneeId;
         this.assignedTo = assigneeId;
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * Bulk updates incident fields with non-null incoming values.
+     *
+     * <p><b>Purpose:</b> Applies partial field modifications from update forms.
+     *
+     * <p><b>Downstream / Workflow:</b> Called by {@link com.northstar.incident.service.LocalIncidentService#updateIncident(UUID, com.northstar.incident.dto.IncidentInput)}.
+     */
     public void updateFields(String category, String subcategory, String service, String serviceOffering,
                              String channel, String state, String impact,
                              String urgency, String priority, String assignedTo,
@@ -175,4 +227,8 @@ public class IncidentEntity {
     public Instant getUpdatedAt() { return updatedAt; }
 
     public void setIncidentNumber(String incidentNumber) { this.incidentNumber = incidentNumber; }
+    public void setExternalLink(String externalId, String externalSystem) {
+        this.externalId = externalId;
+        this.externalSystem = externalSystem;
+    }
 }

@@ -9,6 +9,16 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+/**
+ * Startup component that seeds or updates the primary bootstrap administrator account.
+ *
+ * <p><b>Purpose:</b> Guarantees an initial active administrator exists on service startup when
+ * {@code BOOTSTRAP_ADMIN_EMAIL} and {@code BOOTSTRAP_ADMIN_PASSWORD} environment variables are configured.
+ *
+ * <p><b>Downstream / Workflow:</b> Implements {@link ApplicationRunner}. Executed by Spring Boot once
+ * the ApplicationContext is loaded, verifying or creating the admin user in the MySQL database before
+ * incoming traffic is served.
+ */
 @Component
 public class BootstrapAdmin implements ApplicationRunner {
     private final PortalUserRepository users;
@@ -17,6 +27,19 @@ public class BootstrapAdmin implements ApplicationRunner {
     private final String password;
     private final String name;
 
+    /**
+     * Constructs the BootstrapAdmin runner with user repository, password encoder, and bootstrap configurations.
+     *
+     * <p><b>Purpose:</b> Injects dependencies and configuration properties.
+     *
+     * <p><b>Downstream / Workflow:</b> Initialized during context startup.
+     *
+     * @param users The PortalUserRepository.
+     * @param passwords BCrypt password encoder.
+     * @param email Admin email configured via {@code bootstrap.admin.email}.
+     * @param password Admin password configured via {@code bootstrap.admin.password}.
+     * @param name Admin display name configured via {@code bootstrap.admin.full-name}.
+     */
     public BootstrapAdmin(PortalUserRepository users, PasswordEncoder passwords,
             @Value("${bootstrap.admin.email:}") String email,
             @Value("${bootstrap.admin.password:}") String password,
@@ -28,6 +51,16 @@ public class BootstrapAdmin implements ApplicationRunner {
         this.name = name;
     }
 
+    /**
+     * Seeds or updates the bootstrap administrator account in the database.
+     *
+     * <p><b>Purpose:</b> Validates password complexity (min 12 chars), hashes the password with BCrypt,
+     * and sets role to {@link PortalRole#MANAGER_ADMIN} and active status to true.
+     *
+     * <p><b>Downstream / Workflow:</b> Saves the record in {@link PortalUserRepository}, enabling immediate admin login.
+     *
+     * @param args Startup application arguments.
+     */
     @Override
     public void run(ApplicationArguments args) {
         if (email.isBlank() && password.isBlank()) return;

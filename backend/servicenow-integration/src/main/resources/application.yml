@@ -8,6 +8,8 @@ servicenow:
   client-id: ${SERVICENOW_CLIENT_ID:}
   client-secret: ${SERVICENOW_CLIENT_SECRET:}
   token-uri: ${SERVICENOW_TOKEN_URI:}
+  username: ${SERVICENOW_USERNAME:}
+  password: ${SERVICENOW_PASSWORD:}
 eureka:
   client:
     service-url:
@@ -28,3 +30,7 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 20s
         permittedNumberOfCallsInHalfOpenState: 3
+  timelimiter:
+    instances:
+      serviceNow:
+        timeoutDuration: 15s

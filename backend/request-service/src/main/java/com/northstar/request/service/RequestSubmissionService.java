@@ -11,16 +11,46 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * Service managing idempotent request submissions, gateway identity verification, and validation.
+ *
+ * <p><b>Purpose:</b> Enforces core business submission policies:
+ * <ul>
+ *   <li>Validates Idempotency-Key headers and returns existing records on identical retries, or 409 Conflict on payload mismatch.</li>
+ *   <li>Enforces that gateway-injected {@code X-Authenticated-User} matches the verified JWT subject.</li>
+ *   <li>Resolves requested-for beneficiary identities, restricting on-behalf submissions to MANAGER_ADMIN users.</li>
+ *   <li>Validates required form fields by service type (e.g. "Request a device" requires item and reason).</li>
+ *   <li>Delegates creation to {@link RequestSubmissionWriter}.</li>
+ * </ul>
+ *
+ * <p><b>Downstream / Workflow:</b> Called by {@link com.northstar.request.controller.RequestController#submit}.
+ */
 @Service
 public class RequestSubmissionService {
     private final ServiceRequestRepository requests;
     private final RequestSubmissionWriter writer;
 
+    /**
+     * Constructs RequestSubmissionService.
+     *
+     * @param requests Service request repository.
+     * @param writer Transactional writer component.
+     */
     public RequestSubmissionService(ServiceRequestRepository requests, RequestSubmissionWriter writer) {
         this.requests = requests;
         this.writer = writer;
     }
 
+    /**
+     * Processes and validates an idempotent request submission.
+     *
+     * @param idempotencyKey Client idempotency key.
+     * @param authenticatedUserId Verified JWT subject ID.
+     * @param roles Collection of user role names.
+     * @param gatewayIdentity Gateway forwarded user identity.
+     * @param input Request form inputs.
+     * @return RequestSubmissionResponse DTO.
+     */
     public RequestSubmissionResponse submit(String idempotencyKey, String authenticatedUserId,
             Collection<String> roles, String gatewayIdentity, RequestSubmission input) {
         if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 128) {

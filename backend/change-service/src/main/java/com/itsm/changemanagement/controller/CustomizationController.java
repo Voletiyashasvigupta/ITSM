@@ -1,5 +1,17 @@
 package com.itsm.changemanagement.controller;
 import com.itsm.changemanagement.entity.ConfigRecord;import com.itsm.changemanagement.repository.ConfigRecordRepository;import com.itsm.changemanagement.exception.ApiExceptions;import org.springframework.web.bind.annotation.*;import org.springframework.http.*;import org.springframework.transaction.annotation.Transactional;import com.fasterxml.jackson.databind.*;import java.util.*;
+
+/**
+ * REST controller managing customizable ITSM configurations, custom fields, forms, and CAB definitions.
+ *
+ * <p><b>Purpose:</b> Provides generic CRUD and activation endpoints for customizable resources:
+ * {@code custom-fields}, {@code custom-forms}, {@code custom-workflows}, {@code approval-rules},
+ * {@code change-categories}, {@code notifications}, {@code cab-meetings}, {@code cab-members},
+ * {@code cab-agenda}, and {@code cab-decisions}.
+ *
+ * <p><b>Downstream / Workflow:</b> Intercepts {@code /api/{kind}/**} requests and manipulates {@link ConfigRecord} entities
+ * in the database.
+ */
 @RestController public class CustomizationController {private final ConfigRecordRepository repo;private final ObjectMapper mapper;public CustomizationController(ConfigRecordRepository r,ObjectMapper m){repo=r;mapper=m;}
  private String json(Object o){try{return mapper.writeValueAsString(o);}catch(Exception e){throw new IllegalArgumentException("Invalid JSON payload");}}private Map<String,Object> view(ConfigRecord r){try{Map<String,Object> m=mapper.readValue(r.getPayload(),Map.class);m.put("id",r.getId());m.put("key",r.getConfigKey());m.put("active",r.isActive());m.put("createdAt",r.getCreatedAt());m.put("updatedAt",r.getUpdatedAt());return m;}catch(Exception e){return Map.of("id",r.getId(),"payload",r.getPayload());}}
  @PostMapping("/api/{kind}")@Transactional public ResponseEntity<?> create(@PathVariable String kind,@RequestBody Map<String,Object> body){String type=normalize(kind);String key=String.valueOf(body.getOrDefault("key",body.getOrDefault("fieldKey",body.getOrDefault("name",UUID.randomUUID().toString()))));if(repo.findByConfigTypeAndConfigKey(type,key).isPresent())throw new ApiExceptions.Conflict("Configuration key already exists: "+key);validate(type,body);ConfigRecord saved=repo.save(new ConfigRecord(type,key,json(body)));return ResponseEntity.status(201).body(view(saved));}

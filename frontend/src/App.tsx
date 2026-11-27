@@ -67,7 +67,7 @@ import { useAuth } from './auth/AuthContext'
 import type { PortalUser } from './auth/AuthContext'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-type Request = { id: string; backendId?: string; title: string; category: string; status: string; date: string; createdAt?: string; color: string; description?: string }
+type Request = { id: string; backendId?: string; title: string; category: string; status: string; date: string; createdAt?: string; color: string; description?: string; requesterId?: string; requestedForId?: string; approverId?: string }
 type Approval = { id: string; requestId: string; requestNumber: string; title: string; employee: string; initials: string; requested: string; decision?: string }
 type Approver = { id: string; fullName: string }
 type RequestReceiptData = { number: string; service: string; status: string; approver: string; createdAt: string; details: Array<{ label: string; value: string }> }
@@ -368,6 +368,39 @@ export default function App() {
     })
 
     requests.forEach((req) => {
+      // Check if current user is request riser (requester / requestedFor) or regarding approver
+      const userKey = user?.id?.toLowerCase()
+      const userEmail = user?.email?.toLowerCase()
+      const userFullName = user?.fullName?.toLowerCase()
+      const reqRequester = req.requesterId?.toLowerCase()
+      const reqRequestedFor = req.requestedForId?.toLowerCase()
+      const reqApprover = req.approverId?.toLowerCase()
+
+      const isRiser = Boolean(
+        user && (
+          (reqRequester && (reqRequester === userKey || reqRequester === userEmail)) ||
+          (reqRequestedFor && (reqRequestedFor === userKey || reqRequestedFor === userEmail))
+        )
+      )
+
+      const isApprover = Boolean(
+        user && reqApprover && (
+          reqApprover === userKey ||
+          reqApprover === userEmail ||
+          (userFullName && reqApprover === userFullName)
+        )
+      )
+
+      // Only the regarding approver or request riser should see their request notifications
+      if (!isRiser && !isApprover) {
+        return
+      }
+
+      // If user is solely the approver and already has a pending approval card for this request, avoid duplicate
+      if (!isRiser && isApprover && approvals.some((a) => a.requestNumber === req.id || a.requestId === req.backendId)) {
+        return
+      }
+
       const time = req.createdAt ? new Date(req.createdAt).getTime() : (req.date ? new Date(req.date).getTime() : Date.now())
       list.push({
         id: `req-${req.backendId || req.id}`,
@@ -381,7 +414,7 @@ export default function App() {
     })
 
     return list.sort((a, b) => b.timestamp - a.timestamp)
-  }, [requests, incidentRows, approvals])
+  }, [requests, incidentRows, approvals, user])
 
   const unreadCount = useMemo(() => {
     const readSet = new Set(readNotifIds)
@@ -570,7 +603,7 @@ export default function App() {
         apiFetch('/api/problems'),
       ])
       if (!requestResponse.ok || !approvalResponse.ok || !incidentResponse.ok) throw new Error('Some workspace data could not be loaded. Try again.')
-      const requestPage = await requestResponse.json() as { content?: Array<{ id: string; requestNumber: string; serviceName: string; status: string; createdAt: string; description: string }> }
+      const requestPage = await requestResponse.json() as { content?: Array<{ id: string; requestNumber: string; serviceName: string; status: string; createdAt: string; description: string; requesterId?: string; requestedForId?: string; approverId?: string }> }
       const approvalData = await approvalResponse.json() as Array<{ id: string; requestId: string; requestNumber: string; serviceName: string; requesterId: string; createdAt: string; decision: string }>
       const incidentData = await incidentResponse.json() as IncidentRecord[]
       if (problemResponse.ok) {
@@ -583,7 +616,7 @@ export default function App() {
           setChangesCount(stats.totalChanges ?? 0)
         }
       }).catch(() => {})
-      setRequests((requestPage.content ?? []).map((r) => ({ backendId: r.id, id: r.requestNumber, title: r.serviceName, category: 'Service request', status: r.status.replaceAll('_', ' '), date: new Date(r.createdAt).toLocaleDateString(), createdAt: r.createdAt, color: 'amber', description: r.description })))
+      setRequests((requestPage.content ?? []).map((r) => ({ backendId: r.id, id: r.requestNumber, title: r.serviceName, category: 'Service request', status: r.status.replaceAll('_', ' '), date: new Date(r.createdAt).toLocaleDateString(), createdAt: r.createdAt, color: 'amber', description: r.description, requesterId: r.requesterId, requestedForId: r.requestedForId, approverId: r.approverId })))
       setApprovals(approvalData.filter((a) => a.decision === 'PENDING').map((a) => ({ id: a.id, requestId: a.requestId, requestNumber: a.requestNumber, title: a.serviceName, employee: a.requesterId, initials: a.requesterId.slice(0, 2).toUpperCase(), requested: new Date(a.createdAt).toLocaleDateString() })))
       setIncidentRows(incidentData)
     } catch (cause) { setWorkspaceError(cause instanceof Error ? cause.message : 'Workspace data could not be loaded.') }
@@ -600,14 +633,14 @@ export default function App() {
         apiFetch('/api/problems'),
       ]).then(async ([requestResponse, approvalResponse, incidentResponse, problemResponse]) => {
         if (requestResponse.ok && approvalResponse.ok && incidentResponse.ok) {
-          const requestPage = await requestResponse.json() as { content?: Array<{ id: string; requestNumber: string; serviceName: string; status: string; createdAt: string; description: string }> }
+          const requestPage = await requestResponse.json() as { content?: Array<{ id: string; requestNumber: string; serviceName: string; status: string; createdAt: string; description: string; requesterId?: string; requestedForId?: string; approverId?: string }> }
           const approvalData = await approvalResponse.json() as Array<{ id: string; requestId: string; requestNumber: string; serviceName: string; requesterId: string; createdAt: string; decision: string }>
           const incidentData = await incidentResponse.json() as IncidentRecord[]
           if (problemResponse.ok) {
             const problemData = await problemResponse.json() as ProblemRecord[]
             setProblems(problemData)
           }
-          setRequests((requestPage.content ?? []).map((r) => ({ backendId: r.id, id: r.requestNumber, title: r.serviceName, category: 'Service request', status: r.status.replaceAll('_', ' '), date: new Date(r.createdAt).toLocaleDateString(), createdAt: r.createdAt, color: 'amber', description: r.description })))
+          setRequests((requestPage.content ?? []).map((r) => ({ backendId: r.id, id: r.requestNumber, title: r.serviceName, category: 'Service request', status: r.status.replaceAll('_', ' '), date: new Date(r.createdAt).toLocaleDateString(), createdAt: r.createdAt, color: 'amber', description: r.description, requesterId: r.requesterId, requestedForId: r.requestedForId, approverId: r.approverId })))
           setApprovals(approvalData.filter((a) => a.decision === 'PENDING').map((a) => ({ id: a.id, requestId: a.requestId, requestNumber: a.requestNumber, title: a.serviceName, employee: a.requesterId, initials: a.requesterId.slice(0, 2).toUpperCase(), requested: new Date(a.createdAt).toLocaleDateString() })))
           setIncidentRows(incidentData)
         }
@@ -685,7 +718,7 @@ export default function App() {
   useEffect(() => {
     if (!user) return
     const controller = new AbortController()
-    const timeout = window.setTimeout(() => controller.abort(), 2500)
+    const timeout = window.setTimeout(() => controller.abort(), 15000)
     apiFetch('/api/catalog?limit=100', { signal: controller.signal })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('Catalog is using sample data')))
       .then((result: { stale?: boolean; items?: LiveCatalogItem[] }) => {
@@ -758,7 +791,7 @@ export default function App() {
       const date = dateValue.toLocaleDateString()
       const requestNumber = result.requestNumber || requestFields.requestNumber || `NSR-${dateValue.toISOString().slice(0, 10).replace(/-/g, '')}-${(result.id || crypto.randomUUID()).replace(/-/g, '').slice(0, 8).toUpperCase()}`
       const status = result.status.replaceAll('_', ' ')
-      setRequests((current) => [{ id: requestNumber, backendId: result.id, title: service, category: 'New request', status, date, color: 'amber', description: details.replace(/\n/g, ' · ') }, ...current])
+      setRequests((current) => [{ id: requestNumber, backendId: result.id, title: service, category: 'New request', status, date, color: 'amber', description: details.replace(/\n/g, ' · '), requesterId: user?.id, requestedForId: user?.id, approverId: requestFields.approverId }, ...current])
       setReceipt({ number: requestNumber, service, status, approver: approverName, createdAt: dateValue.toLocaleString(), details: [...detailItems, { label: 'Approver', value: approverName }] })
       setSelectedService(null)
       setRequestFields({})
@@ -2094,8 +2127,27 @@ export default function App() {
           <Box className="dashboard-grid"><Paper className="content-card requests-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Recent requests</Typography><Typography className="section-note">Requests submitted during this session</Typography></Box><Button endIcon={<KeyboardArrowRightRounded />} onClick={() => setActive('Requests')}>View all</Button></Box><RequestTable requests={requests.slice(0, 3)} compact /></Paper>
             {user.role === 'MANAGER_ADMIN' && <Paper className="content-card approval-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Needs your attention</Typography><Typography className="section-note">Requests awaiting your approval</Typography></Box><Chip size="small" label={`${approvals.length} pending`} color="warning" variant="outlined" /></Box>{approvals.slice(0,3).map((approval) => <Box className="approval-item" key={approval.id}><Typography className="approval-title">{approval.requestNumber} · {approval.title}</Typography><Button size="small" onClick={() => setActive('Approvals')}>Review</Button></Box>)}{approvals.length === 0 && <Typography color="text.secondary" sx={{ py: 2 }}>No pending approvals.</Typography>}</Paper>}
           </Box>
-          <Box className="section-heading catalog-heading"><Box><Typography variant="h6">Quick access</Typography><Typography className="section-note">Start with one of the most requested services.</Typography></Box><Button endIcon={<KeyboardArrowRightRounded />} onClick={() => setActive('Service catalog')}>Browse catalog</Button></Box>
-          <Box className="service-grid quick-grid">{services.slice(0, 3).map((service) => <ButtonBase component={Paper} key={service.title} className="service-card quick-card" aria-label={`Start request: ${service.title}`} onClick={() => void openServiceForm(service.title)}><Box className={`service-icon ${service.tint}`}>{service.icon}</Box><Typography className="service-title">{service.title}</Typography><Typography className="service-description">{service.description}</Typography><Box className="service-action">Get started <KeyboardArrowRightRounded /></Box></ButtonBase>)}</Box>
+          <Box className="section-heading catalog-heading">
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box>
+                <Typography variant="h6">Quick access</Typography>
+                <Typography className="section-note">Start with one of the most requested services.</Typography>
+              </Box>
+              <Chip size="small" label={liveCatalog.length ? (catalogStale ? 'Last known data' : 'ServiceNow catalog') : 'Sample catalog'} variant="outlined" color={liveCatalog.length ? 'success' : 'default'} />
+            </Box>
+            <Button endIcon={<KeyboardArrowRightRounded />} onClick={() => setActive('Service catalog')}>Browse catalog</Button>
+          </Box>
+          <Box className="service-grid quick-grid">
+            {(displayedCatalog.length ? displayedCatalog : services).slice(0, 4).map((service, index) => (
+              <ButtonBase component={Paper} key={`${service.title}-${index}`} className="service-card quick-card" aria-label={`Start request: ${service.title}`} onClick={() => void openServiceForm(service.title)}>
+                <Box className={`service-icon ${service.tint}`}>{service.icon}</Box>
+                <Chip size="small" label={service.group} className="group-chip" />
+                <Typography className="service-title">{service.title}</Typography>
+                <Typography className="service-description">{service.description}</Typography>
+                <Box className="service-action">Get started <KeyboardArrowRightRounded /></Box>
+              </ButtonBase>
+            ))}
+          </Box>
         </> : <Paper className="content-card placeholder"><Box className="placeholder-icon">{employeeNav.concat(managementNav).find((item) => item.label === active)?.icon ?? <SettingsOutlined />}</Box><Typography variant="h6">{active}</Typography><Typography className="section-note">This workspace is ready for the next feature in the service portal.</Typography><Button variant="outlined" onClick={() => setActive('Overview')}>Back to overview</Button></Paper>}
         </Box>
         <Box className="footer"><span>ITSM · Internal Service Hub</span><span>Need help? Contact your service desk</span></Box>

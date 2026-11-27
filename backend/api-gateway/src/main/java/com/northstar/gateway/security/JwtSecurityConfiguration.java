@@ -28,8 +28,32 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtGra
 import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 
+/**
+ * Security configuration for the API Gateway using reactive Spring Security and JWT.
+ *
+ * <p><b>Purpose:</b> Configures OAuth2 Resource Server capabilities, endpoint authorization rules,
+ * JWT HMAC-SHA256 signature and audience verification, and role-to-authority mapping for all incoming requests.
+ *
+ * <p><b>Downstream / Workflow:</b> Intercepts every HTTP request entering the Gateway. Unauthenticated requests to
+ * protected routes are rejected immediately (401/403). Valid requests have their authorities populated and flow
+ * through to the {@link RequestIdentityFilter} before reaching downstream microservices.
+ */
 @Configuration
 public class JwtSecurityConfiguration {
+
+    /**
+     * Defines the reactive security filter chain and endpoint access rules.
+     *
+     * <p><b>Purpose:</b> Configures route-level authorization (public auth/health routes, manager-admin restricted
+     * admin routes, and authenticated-only business API routes) and disables CSRF for stateless REST.
+     *
+     * <p><b>Downstream / Workflow:</b> Spring WebFlux applies this filter chain to each incoming ServerWebExchange.
+     * Authorized exchanges proceed to route matching and downstream forwarding.
+     *
+     * @param http The ServerHttpSecurity builder.
+     * @param jwtAuthenticationConverter Converter turning decoded JWT into Spring Security Authentication.
+     * @return Configured SecurityWebFilterChain.
+     */
     @Bean
     SecurityWebFilterChain gatewaySecurity(ServerHttpSecurity http,
             Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter) {
@@ -45,6 +69,20 @@ public class JwtSecurityConfiguration {
                 .build();
     }
 
+    /**
+     * Builds the reactive JWT decoder configured with HMAC-SHA256 verification, issuer check, and audience check.
+     *
+     * <p><b>Purpose:</b> Cryptographically verifies JWT signatures issued by the Auth Service and validates token
+     * issuer and audience claims.
+     *
+     * <p><b>Downstream / Workflow:</b> Invoked by the OAuth2 Resource Server authentication filter whenever a Bearer
+     * token is supplied in the Authorization header. Produces a validated {@link Jwt} object.
+     *
+     * @param secret The signing secret key (minimum 32 bytes).
+     * @param issuer The required token issuer URI.
+     * @param audience The required token audience identifier.
+     * @return The configured ReactiveJwtDecoder.
+     */
     @Bean
     ReactiveJwtDecoder jwtDecoder(
             @Value("${security.jwt.secret}") String secret,
@@ -62,6 +100,17 @@ public class JwtSecurityConfiguration {
         return decoder;
     }
 
+    /**
+     * Creates a converter that transforms JWT claims into Spring Security GrantedAuthority instances.
+     *
+     * <p><b>Purpose:</b> Normalizes application roles from the token's "roles" claim array, mapping variants like
+     * MANAGER, ADMIN, and MANAGER_ADMIN to the unified ROLE_MANAGER_ADMIN authority, and standardizing other system roles.
+     *
+     * <p><b>Downstream / Workflow:</b> Populates the ReactiveSecurityContext with granted authorities used by the
+     * gateway's pathMatcher authorization checks.
+     *
+     * @return Converter turning a Jwt into an AbstractAuthenticationToken.
+     */
     @Bean
     Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter scopeConverter = new JwtGrantedAuthoritiesConverter();

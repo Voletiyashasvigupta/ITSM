@@ -3,6 +3,13 @@ package com.northstar.incident.dto;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Data transfer record summarizing an incident ticket for list and table displays.
+ *
+ * <p><b>Purpose:</b> Exposes ITIL attributes, legacy compatibility fields, and assignment state to frontend clients.
+ *
+ * <p><b>Downstream / Workflow:</b> Returned by {@code GET /api/incidents} and embedded in {@link IncidentDetailResponse}.
+ */
 public record IncidentResponse(
     UUID id,
     String incidentNumber,

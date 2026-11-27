@@ -24,6 +24,9 @@ bootstrap:
     email: ${BOOTSTRAP_ADMIN_EMAIL:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
     full-name: ${BOOTSTRAP_ADMIN_NAME:Northstar Administrator}
+portal:
+  impersonation:
+    enabled: ${PORTAL_IMPERSONATION_ENABLED:true}
 eureka:
   client:
     service-url:

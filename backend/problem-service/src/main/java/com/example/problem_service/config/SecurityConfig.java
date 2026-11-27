@@ -14,16 +14,45 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 
+/**
+ * Spring Security configuration for the Problem Service.
+ *
+ * <p><b>Purpose:</b> Enforces stateless session management, JWT authentication via {@link JwtAuthenticationFilter},
+ * and route-based authorization rules across Problem Management endpoints.
+ *
+ * <p><b>Downstream / Workflow:</b> Intercepts all incoming HTTP calls before reaching {@code ProblemController}.
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter filter;
 
+    /**
+     * Constructs the SecurityConfig.
+     *
+     * <p><b>Purpose:</b> Injects the custom JWT authentication filter.
+     *
+     * <p><b>Downstream / Workflow:</b> Initialized by Spring Boot on startup.
+     *
+     * @param filter The JwtAuthenticationFilter bean.
+     */
     public SecurityConfig(JwtAuthenticationFilter filter) {
         this.filter = filter;
     }
 
+    /**
+     * Defines the HTTP security filter chain and authorization policies.
+     *
+     * <p><b>Purpose:</b> Disables CSRF, sets session policy to stateless, specifies 401 Unauthorized entry point,
+     * allows public actuator endpoints, requires authentication for all problem endpoints, and registers the JWT filter.
+     *
+     * <p><b>Downstream / Workflow:</b> Applied to each incoming HTTP request to the Problem Service.
+     *
+     * @param http HttpSecurity builder.
+     * @return Built SecurityFilterChain.
+     * @throws Exception if configuration fails.
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
             throws Exception {

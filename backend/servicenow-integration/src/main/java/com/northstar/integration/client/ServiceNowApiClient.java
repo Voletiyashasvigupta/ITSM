@@ -1,9 +1,16 @@
 package com.northstar.integration.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.northstar.integration.config.ServiceNowProperties;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory;
@@ -15,29 +22,144 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
-/** The only HTTP client allowed to call the external ServiceNow instance. */
+/**
+ * HTTP client component responsible for communicating with the external ServiceNow instance.
+ *
+ * <p><b>Purpose:</b> Acts as the sole authorized egress client to external ServiceNow REST APIs.
+ * Supports two authentication strategies automatically selected at runtime:
+ * <ul>
+ *   <li><b>Basic Auth</b> – used when {@code SERVICENOW_USERNAME} and {@code SERVICENOW_PASSWORD}
+ *       are supplied (required for ServiceNow PDIs where Bearer tokens are blocked by the
+ *       "unscoped API" restriction).</li>
+ *   <li><b>OAuth2 Bearer</b> – used in production environments where the ServiceNow OAuth
+ *       Application Registry has the {@code client_credentials} grant enabled.</li>
+ * </ul>
+ * Also applies Resilience4j circuit breaking and exponential backoff retries.
+ *
+ * <p><b>Downstream / Workflow:</b> Called by {@link com.northstar.integration.controller.CatalogProxyController}
+ * when requests arrive from the internal Catalog Service. Returns parsed JSON nodes containing ServiceNow catalog items.
+ */
 @Component
 public class ServiceNowApiClient {
+    private static final Logger log = LoggerFactory.getLogger(ServiceNowApiClient.class);
     private final RestClient restClient;
     private final ServiceNowProperties properties;
     private final CircuitBreakerFactory<?, ?> circuitBreakers;
     private volatile Token cachedToken;
     private volatile Instant tokenExpiresAt = Instant.EPOCH;
 
+    /**
+     * Constructs the ServiceNowApiClient with necessary HTTP builder, configuration, and circuit breaker.
+     *
+     * <p><b>Purpose:</b> Dependency injection constructor for initializing HTTP and resilience components.
+     *
+     * <p><b>Downstream / Workflow:</b> Spring instantiates this bean at service startup.
+     *
+     * @param builder The RestClient builder.
+     * @param properties Configuration properties for ServiceNow.
+     * @param circuitBreakers Factory for creating Resilience4j circuit breakers.
+     */
     public ServiceNowApiClient(RestClient.Builder builder, ServiceNowProperties properties, CircuitBreakerFactory<?, ?> circuitBreakers) {
         this.restClient = builder.build();
         this.properties = properties;
         this.circuitBreakers = circuitBreakers;
     }
 
-    public JsonNode readCatalog(int limit) {
+    /**
+     * Reads catalog items from ServiceNow wrapped in a circuit breaker and retry mechanism.
+     *
+     * <p><b>Purpose:</b> Entry method for querying ServiceNow catalog table items while protecting the system
+     * against external service degradation or cascading failures.
+     *
+     * <p><b>Downstream / Workflow:</b> Enforces configuration check, wraps {@link #readCatalogWithRetry(int)}
+     * in the "serviceNow" circuit breaker, and returns the catalog JSON or raises a 503 SERVICE_UNAVAILABLE error.
+     *
+     * @param limit Maximum number of records to retrieve.
+     * @return JsonNode containing the array of catalog item records.
+     */
+    public List<Map<String, Object>> readCatalog(int limit) {
         requireConfiguration();
         return circuitBreakers.create("serviceNow").run(
                 () -> readCatalogWithRetry(limit),
-                failure -> { throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "ServiceNow is temporarily unavailable"); });
+                failure -> {
+                    log.error("ServiceNow catalog read failed: {}", failure.getMessage(), failure);
+                    throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "ServiceNow is temporarily unavailable");
+                });
     }
 
-    private JsonNode readCatalogWithRetry(int limit) {
+    /**
+     * Submits a new record to any specified table in ServiceNow Table API.
+     *
+     * <p><b>Purpose:</b> Creates a real ticket in ServiceNow (e.g. incident, problem, change_request, sc_req_item).
+     *
+     * @param table Target table name.
+     * @param payload Attributes to store in ServiceNow.
+     * @return Map containing ServiceNow ticket result (number, sys_id, state, sys_created_on, etc.).
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> createRecord(String table, Map<String, Object> payload) {
+        requireConfiguration();
+        return circuitBreakers.create("serviceNow").run(
+                () -> {
+                    String authHeader = buildAuthorizationHeader();
+                    Map<String, Object> body = restClient.post()
+                            .uri(properties.baseUrl() + "/api/now/table/" + table)
+                            .headers(headers -> headers.set("Authorization", authHeader))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(payload)
+                            .retrieve()
+                            .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+                    if (body == null || !(body.get("result") instanceof Map<?, ?> result)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "ServiceNow " + table + " creation returned invalid payload");
+                    }
+                    return (Map<String, Object>) result;
+                },
+                failure -> {
+                    log.error("ServiceNow {} creation failed: {}", table, failure.getMessage(), failure);
+                    throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "ServiceNow " + table + " creation failed");
+                });
+    }
+
+    /**
+     * Submits a new incident to the ServiceNow Table API.
+     */
+    public Map<String, Object> createIncident(Map<String, Object> payload) {
+        return createRecord("incident", payload);
+    }
+
+    /**
+     * Submits a new service request (requested item) to the ServiceNow Table API.
+     */
+    public Map<String, Object> createRequest(Map<String, Object> payload) {
+        return createRecord("sc_req_item", payload);
+    }
+
+    /**
+     * Submits a new problem to the ServiceNow Table API.
+     */
+    public Map<String, Object> createProblem(Map<String, Object> payload) {
+        return createRecord("problem", payload);
+    }
+
+    /**
+     * Submits a new change request to the ServiceNow Table API.
+     */
+    public Map<String, Object> createChange(Map<String, Object> payload) {
+        return createRecord("change_request", payload);
+    }
+
+    /**
+     * Executes the catalog fetch with up to 4 retry attempts and exponential backoff.
+     *
+     * <p><b>Purpose:</b> Provides resilience against transient network anomalies and upstream 5xx errors.
+     *
+     * <p><b>Downstream / Workflow:</b> Repeatedly invokes {@link #fetchCatalog(int)} until successful or retries
+     * are exhausted, sleeping with exponential delay between attempts.
+     *
+     * @param limit Maximum number of records to retrieve.
+     * @return List of catalog item maps retrieved from ServiceNow.
+     */
+    private List<Map<String, Object>> readCatalogWithRetry(int limit) {
         RuntimeException lastFailure = null;
         for (int attempt = 0; attempt < 4; attempt++) {
             try {
@@ -60,25 +182,83 @@ public class ServiceNowApiClient {
         throw lastFailure == null ? new IllegalStateException("ServiceNow request failed") : lastFailure;
     }
 
-    private JsonNode fetchCatalog(int limit) {
-        Token token = acquireToken();
-        JsonNode body = restClient.get()
-                .uri(properties.baseUrl() + "/api/now/table/sc_cat_item?sysparm_fields=sys_id,name,short_description,category,active&sysparm_limit=" + limit)
-                .headers(headers -> headers.setBearerAuth(token.accessToken()))
+    /**
+     * Dispatches an authenticated GET request to the ServiceNow Table API.
+     *
+     * <p><b>Purpose:</b> Queries the {@code sc_cat_item} table using the most compatible auth strategy:
+     * Basic Auth when username+password are configured (required for ServiceNow PDIs where the "unscoped API"
+     * restriction blocks OAuth Bearer tokens), falling back to OAuth2 Bearer in production environments.
+     *
+     * <p><b>Downstream / Workflow:</b> Selects auth strategy via {@link #buildAuthorizationHeader()},
+     * issues HTTP GET to the Table API, and extracts the {@code result} list of item maps.
+     *
+     * @param limit Query record limit.
+     * @return List of catalog item attribute maps from the "result" field of the response.
+     */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> fetchCatalog(int limit) {
+        String authHeader = buildAuthorizationHeader();
+        Map<String, Object> body = restClient.get()
+                .uri(properties.baseUrl() + "/api/now/table/sc_cat_item?sysparm_fields=sys_id,name,short_description,category,active&sysparm_limit=" + limit + "&sysparm_query=active=true")
+                .headers(headers -> headers.set("Authorization", authHeader))
                 .retrieve()
-                .body(JsonNode.class);
-        return body == null ? null : body.path("result");
+                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+        if (body == null || !(body.get("result") instanceof List<?> result)) {
+            return Collections.emptyList();
+        }
+        return (List<Map<String, Object>>) result;
     }
 
+    /**
+     * Builds the HTTP Authorization header value using the optimal strategy for this environment.
+     *
+     * <p><b>Purpose:</b> Selects Basic Auth for ServiceNow PDIs (where OAuth Bearer is blocked by the
+     * "Access to unscoped API" restriction) or OAuth2 Bearer for production instances with client_credentials enabled.
+     *
+     * <p><b>Downstream / Workflow:</b> Called by {@link #fetchCatalog(int)} on every request. Basic Auth
+     * credentials are Base64-encoded from {@code username:password}. OAuth path calls {@link #acquireToken()}.
+     *
+     * @return The full "Authorization: ..." header value string.
+     */
+    private String buildAuthorizationHeader() {
+        if (properties.hasPasswordGrant()) {
+            // Use Basic Auth for PDI environments — ServiceNow PDIs block Bearer tokens on unscoped REST APIs.
+            String credentials = properties.username() + ":" + properties.password();
+            String encoded = Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+            return "Basic " + encoded;
+        }
+        // Production: use OAuth2 Bearer token (requires client_credentials grant enabled in Application Registry)
+        Token token = acquireToken();
+        return "Bearer " + token.accessToken();
+    }
+
+    /**
+     * Obtains an OAuth2 access token via password or client_credentials grant, caching until 30s before expiry.
+     *
+     * <p><b>Purpose:</b> Manages OAuth2 token lifecycle for production ServiceNow instances.
+     * Not used when Basic Auth is active (PDI environments).
+     *
+     * <p><b>Downstream / Workflow:</b> Checks in-memory cache; if expired, selects the appropriate grant
+     * type, POSTs to {@code properties.tokenUri()}, caches the result, and returns it.
+     *
+     * @return A valid {@link Token} object.
+     */
     private synchronized Token acquireToken() {
         Instant now = Instant.now();
         if (cachedToken != null && now.isBefore(tokenExpiresAt.minusSeconds(30))) {
             return cachedToken;
         }
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("grant_type", "client_credentials");
         form.add("client_id", properties.clientId());
         form.add("client_secret", properties.clientSecret());
+
+        if (properties.hasPasswordGrant()) {
+            form.add("grant_type", "password");
+            form.add("username", properties.username());
+            form.add("password", properties.password());
+        } else {
+            form.add("grant_type", "client_credentials");
+        }
 
         Token token = restClient.post()
                 .uri(properties.tokenUri())
@@ -95,12 +275,30 @@ public class ServiceNowApiClient {
         return cachedToken;
     }
 
+    /**
+     * Asserts that ServiceNow credentials and URLs are configured.
+     *
+     * <p><b>Purpose:</b> Fails fast with HTTP 503 if the service has not been supplied with ServiceNow credentials.
+     *
+     * <p><b>Downstream / Workflow:</b> Evaluated before entering network call pathways.
+     */
     private void requireConfiguration() {
         if (!properties.credentialsConfigured()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "ServiceNow integration is not configured");
         }
     }
 
+    /**
+     * Data record representing the OAuth2 token payload returned by ServiceNow.
+     *
+     * <p><b>Purpose:</b> Deserializes the JSON token response containing the access token string, token type, and expiration seconds.
+     *
+     * <p><b>Downstream / Workflow:</b> Used internally by {@link #acquireToken()} and cached for Bearer authorization headers.
+     *
+     * @param accessToken The Bearer access token string.
+     * @param tokenType The token type (usually "Bearer").
+     * @param expiresIn Time to live in seconds.
+     */
     public record Token(
             @JsonProperty("access_token") String accessToken,
             @JsonProperty("token_type") String tokenType,

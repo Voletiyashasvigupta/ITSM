@@ -48,11 +48,11 @@ services:
       RABBITMQ_DEFAULT_USER: northstar
       RABBITMQ_DEFAULT_PASS: northstar
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 5672 || exit 1"]
+      interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 20s
+      retries: 20
+      start_period: 30s
     networks:
       - itsm-network
 
@@ -72,12 +72,40 @@ services:
       - "${EUREKA_HOST_PORT:-8762}:8761"
     environment:
       PORT: 8761
+      JAVA_TOOL_OPTIONS: "-Xmx192m -Xms64m -XX:+UseSerialGC"
     networks:
       - itsm-network
 
   # ============================================================================
   # Business Microservices
   # ============================================================================
+
+  servicenow-integration:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        MODULE: servicenow-integration
+    container_name: itsm-servicenow-integration
+    restart: unless-stopped
+    ports:
+      - "${SERVICENOW_HOST_PORT:-18089}:8089"
+    environment:
+      PORT: 8089
+      JAVA_TOOL_OPTIONS: "-Xmx192m -Xms64m -XX:+UseSerialGC"
+      EUREKA_URL: http://service-registry:8761/eureka/
+      EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+      SERVICENOW_BASE_URL: https://dev426011.service-now.com
+      SERVICENOW_CLIENT_ID: 5b0d6b08b0d24302840bbd20ede26a3b
+      SERVICENOW_CLIENT_SECRET: "36u.k#,dClDmKH81&pgS+A9q6THSoW:`"
+      SERVICENOW_TOKEN_URI: https://dev426011.service-now.com/oauth_token.do
+      SERVICENOW_USERNAME: admin
+      SERVICENOW_PASSWORD: "^I$$p1JN3ufjA"
+    depends_on:
+      service-registry:
+        condition: service_started
+    networks:
+      - itsm-network
 
   auth-service:
     build:
@@ -91,6 +119,7 @@ services:
       - "8088:8088"
     environment:
       PORT: 8088
+      JAVA_TOOL_OPTIONS: "-Xmx192m -Xms64m -XX:+UseSerialGC"
       MYSQL_URL: jdbc:mysql://mysql:3306/northstar_auth?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       MYSQL_USER: root
       MYSQL_PASSWORD: root
@@ -100,6 +129,7 @@ services:
       BOOTSTRAP_ADMIN_PASSWORD: NorthstarLocal2026!
       BOOTSTRAP_ADMIN_NAME: Northstar Administrator
       JWT_SIGNING_SECRET: lrsOqxVRR53Tv6VUOZ4ZRW4G4mI5FlU0ODDQUvua6o-lcBbdH_2zuzTbzhg5mDik
+      PORTAL_IMPERSONATION_ENABLED: "true"
     depends_on:
       mysql:
         condition: service_healthy
@@ -120,6 +150,7 @@ services:
       - "${CATALOG_HOST_PORT:-18081}:8081"
     environment:
       PORT: 8081
+      JAVA_TOOL_OPTIONS: "-Xmx192m -Xms64m -XX:+UseSerialGC"
       REDIS_HOST: redis
       REDIS_PORT: 6379
       EUREKA_URL: http://service-registry:8761/eureka/
@@ -144,6 +175,7 @@ services:
       - "8087:8087"
     environment:
       PORT: 8087
+      JAVA_TOOL_OPTIONS: "-Xmx192m -Xms64m -XX:+UseSerialGC"
       MYSQL_URL: jdbc:mysql://mysql:3306/northstar_incident_service?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       MYSQL_USER: root
       MYSQL_PASSWORD: root
@@ -170,6 +202,7 @@ services:
       - "${REQUEST_HOST_PORT:-18082}:8082"
     environment:
       PORT: 8082
+      JAVA_TOOL_OPTIONS: "-Xmx192m -Xms64m -XX:+UseSerialGC"
       MYSQL_URL: jdbc:mysql://mysql:3306/northstar_request_service?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       MYSQL_USER: root
       MYSQL_PASSWORD: root
@@ -200,6 +233,7 @@ services:
       - "8089:8089"
     environment:
       PORT: 8089
+      JAVA_TOOL_OPTIONS: "-Xmx192m -Xms64m -XX:+UseSerialGC"
       MYSQL_URL: jdbc:mysql://mysql:3306/problem_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       MYSQL_USER: root
       MYSQL_PASSWORD: root
@@ -224,6 +258,7 @@ services:
       - "8091:8091"
     environment:
       PORT: 8091
+      JAVA_TOOL_OPTIONS: "-Xmx192m -Xms64m -XX:+UseSerialGC"
       SERVER_PORT: 8091
       MYSQL_URL: jdbc:mysql://mysql:3306/change_management?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       DB_URL: jdbc:mysql://mysql:3306/change_management?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
@@ -260,6 +295,7 @@ services:
       - "7777:8080"
     environment:
       PORT: 8080
+      JAVA_TOOL_OPTIONS: "-Xmx192m -Xms64m -XX:+UseSerialGC"
       EUREKA_URL: http://service-registry:8761/eureka/
       EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
       JWT_SIGNING_SECRET: lrsOqxVRR53Tv6VUOZ4ZRW4G4mI5FlU0ODDQUvua6o-lcBbdH_2zuzTbzhg5mDik

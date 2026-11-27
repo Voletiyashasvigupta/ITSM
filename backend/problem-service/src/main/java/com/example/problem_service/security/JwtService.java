@@ -16,12 +16,30 @@ import java.util.Collection;
 import java.util.Locale;
 import io.jsonwebtoken.JwtException;
 
+/**
+ * JWT parsing and validation utility service for Problem Management.
+ *
+ * <p><b>Purpose:</b> Cryptographically verifies JJWT tokens, extracts user claims (email, subject, roles),
+ * and maps composite roles (such as MANAGER_ADMIN) to granular problem management permissions
+ * (PROBLEM_MANAGER, PROBLEM_ANALYST, TECHNICAL_SUPPORT_ENGINEER).
+ *
+ * <p><b>Downstream / Workflow:</b> Injected into {@link JwtAuthenticationFilter} to authenticate inbound requests.
+ */
 @Service
 public class JwtService {
 
     @Value("${jwt.secret}")
     private String secret;
 
+    /**
+     * Resolves the SecretKey from either UTF-8 bytes or Base64 decoding.
+     *
+     * <p><b>Purpose:</b> Supports flexible signing key encoding formats.
+     *
+     * <p><b>Downstream / Workflow:</b> Used during token verification and claims extraction.
+     *
+     * @return Initialized SecretKey.
+     */
     private SecretKey getSigningKey() {
         byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
         if (bytes.length >= 32) {
@@ -34,6 +52,16 @@ public class JwtService {
         }
     }
 
+    /**
+     * Validates that the provided token has a valid signature and is not malformed or expired.
+     *
+     * <p><b>Purpose:</b> Fast token authenticity check.
+     *
+     * <p><b>Downstream / Workflow:</b> Called by {@link JwtAuthenticationFilter#doFilterInternal} on every API request.
+     *
+     * @param token Bearer JWT string.
+     * @return {@code true} if valid; {@code false} otherwise.
+     */
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
@@ -56,6 +84,16 @@ public class JwtService {
         }
     }
 
+    /**
+     * Parses and extracts claims payload from the token.
+     *
+     * <p><b>Purpose:</b> Internal claim decoder.
+     *
+     * <p><b>Downstream / Workflow:</b> Used by {@link #extractEmail(String)} and {@link #extractRoles(String)}.
+     *
+     * @param token Bearer token string.
+     * @return Decoded Claims payload.
+     */
     private Claims getClaims(String token) {
         try {
             return Jwts.parser()
@@ -73,6 +111,16 @@ public class JwtService {
         }
     }
 
+    /**
+     * Extracts email address or subject identifier from the token.
+     *
+     * <p><b>Purpose:</b> Identifies the authenticated caller.
+     *
+     * <p><b>Downstream / Workflow:</b> Used to build the Spring Security Principal.
+     *
+     * @param token Bearer JWT.
+     * @return User email or subject string.
+     */
     public String extractEmail(String token) {
         Claims claims = getClaims(token);
         String email = claims.get("email", String.class);
@@ -82,6 +130,16 @@ public class JwtService {
         return claims.getSubject();
     }
 
+    /**
+     * Extracts and maps authority roles from JWT claims.
+     *
+     * <p><b>Purpose:</b> Normalizes roles and expands composite administrative roles into problem domain roles.
+     *
+     * <p><b>Downstream / Workflow:</b> Populates the Spring Security authorities collection.
+     *
+     * @param token Bearer JWT.
+     * @return List of role names.
+     */
     public List<String> extractRoles(String token) {
         Claims claims = getClaims(token);
         List<String> result = new ArrayList<>();
@@ -106,6 +164,16 @@ public class JwtService {
         return result;
     }
 
+    /**
+     * Maps incoming role string to standardized internal roles.
+     *
+     * <p><b>Purpose:</b> Normalizes MANAGER_ADMIN into fine-grained ITIL problem roles.
+     *
+     * <p><b>Downstream / Workflow:</b> Internal helper for {@link #extractRoles(String)}.
+     *
+     * @param result Collector list.
+     * @param r Raw role string.
+     */
     private void addMappedRole(List<String> result, String r) {
         String normalized = r.trim().toUpperCase(Locale.ROOT);
         if (normalized.startsWith("ROLE_")) {

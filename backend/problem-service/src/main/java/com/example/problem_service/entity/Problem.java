@@ -4,6 +4,16 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import jakarta.validation.constraints.NotBlank;
 
+/**
+ * JPA entity representing a Problem record in the {@code problems} table.
+ *
+ * <p><b>Purpose:</b> Models complete ITIL Problem Management data: problem numbers (PRB0000001),
+ * title, category, priority, status (OPEN, UNDER_INVESTIGATION, KNOWN_ERROR, RESOLVED, CLOSED),
+ * assigned analysts and engineers, investigation notes, root-cause analysis, workarounds, and resolution documentation.
+ *
+ * <p><b>Downstream / Workflow:</b> Persisted via {@link com.example.problem_service.repository.ProblemRepository}
+ * and manipulated by {@link com.example.problem_service.service.ProblemService}.
+ */
 @Entity
 @Table(name = "problems")
 public class Problem {
@@ -52,8 +62,17 @@ public class Problem {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    /** Default constructor for JPA. */
     public Problem() {}
 
+    /**
+     * JPA lifecycle callback executed prior to persistence.
+     *
+     * <p><b>Purpose:</b> Sets creation timestamps, generates default problem numbers (e.g. PRB0012345),
+     * and defaults initial status to OPEN.
+     *
+     * <p><b>Downstream / Workflow:</b> Executed by Hibernate before entity insertion.
+     */
     @PrePersist
     public void onCreate() {
         createdAt = LocalDateTime.now();
@@ -67,6 +86,13 @@ public class Problem {
         }
     }
 
+    /**
+     * JPA lifecycle callback executed before entity update.
+     *
+     * <p><b>Purpose:</b> Updates the modification timestamp.
+     *
+     * <p><b>Downstream / Workflow:</b> Executed automatically prior to SQL update.
+     */
     @PreUpdate
     public void onUpdate() {
         updatedAt = LocalDateTime.now();

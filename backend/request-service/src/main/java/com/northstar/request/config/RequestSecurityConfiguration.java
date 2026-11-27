@@ -20,8 +20,23 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * Security configuration for the Service Request microservice.
+ *
+ * <p><b>Purpose:</b> Configures HMAC-SHA256 JWT decoding, issuer/audience validation, and stateless
+ * authorization rules protecting request and approval REST endpoints.
+ *
+ * <p><b>Downstream / Workflow:</b> Applied to all incoming requests under {@code /api/requests/**} and {@code /api/approvals/**}.
+ */
 @Configuration
 public class RequestSecurityConfiguration {
+
+    /**
+     * Constructs the SecretKey bean for validating JWT token signatures.
+     *
+     * @param secret Configured signing secret (min 32 bytes).
+     * @return SecretKey instance.
+     */
     @Bean
     SecretKey requestJwtSecretKey(@Value("${security.jwt.secret}") String secret) {
         byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
@@ -29,6 +44,14 @@ public class RequestSecurityConfiguration {
         return new SecretKeySpec(bytes, "HmacSHA256");
     }
 
+    /**
+     * Builds the NimbusJwtDecoder bean for the Request Service.
+     *
+     * @param requestJwtSecretKey Signing key.
+     * @param issuer Expected token issuer URI.
+     * @param audience Expected audience string.
+     * @return Configured JwtDecoder.
+     */
     @Bean
     JwtDecoder requestJwtDecoder(SecretKey requestJwtSecretKey,
             @Value("${security.jwt.issuer}") String issuer,
@@ -44,6 +67,13 @@ public class RequestSecurityConfiguration {
         return decoder;
     }
 
+    /**
+     * Configures HTTP security rules requiring authentication on all API routes except health checks.
+     *
+     * @param http HttpSecurity builder.
+     * @return Built SecurityFilterChain.
+     * @throws Exception on security failure.
+     */
     @Bean
     SecurityFilterChain requestSecurityFilterChain(HttpSecurity http) throws Exception {
         return http.csrf(csrf -> csrf.disable())

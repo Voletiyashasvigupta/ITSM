@@ -1,5 +1,17 @@
 package com.itsm.changemanagement.entity;
 import jakarta.persistence.*;import java.time.*;
+
+/**
+ * JPA entity representing a Change Request (RFC) in {@code change_requests}.
+ *
+ * <p><b>Purpose:</b> Central ITIL Change Management entity encapsulating all request details: unique change number
+ * (CHG-XXXXXXXX), requester info, change type/category/priority/risk, business justifications,
+ * implementation/rollback/test plans, scheduled windows, CAB reviews and approvals, progress tracking,
+ * post-validation results, rollback actions, PIR notes, and custom dynamic form values.
+ *
+ * <p><b>Downstream / Workflow:</b> Persisted and manipulated by {@link com.itsm.changemanagement.service.ChangeService}
+ * through repository {@link com.itsm.changemanagement.repository.ChangeRequestRepository}.
+ */
 @Entity @Table(name="change_requests", uniqueConstraints=@UniqueConstraint(columnNames="change_number"))
 public class ChangeRequest {
  @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;

@@ -9,17 +9,41 @@ import com.example.problem_service.entity.Problem;
 
 import java.util.*;
 
+/**
+ * REST controller providing API endpoints for ITIL Problem Management.
+ *
+ * <p><b>Purpose:</b> Exposes operations to create, list, inspect, triage, investigate, resolve, and delete
+ * problem records. Maps authenticated user credentials and roles to appropriate lifecycle transitions.
+ *
+ * <p><b>Downstream / Workflow:</b> Receives client HTTP calls routed under {@code /api/problems/**} and delegates
+ * to {@link ProblemService}.
+ */
 @RestController
 @RequestMapping("/api/problems")
 public class ProblemController {
 
     private final ProblemService service;
 
+    /**
+     * Constructs the ProblemController with ProblemService.
+     *
+     * @param service Problem business service.
+     */
     public ProblemController(ProblemService service) {
         this.service = service;
     }
 
-    // CREATE PROBLEM - ACCESSIBLE TO ALL AUTHENTICATED USERS (EMPLOYEE, ANALYST, ADMIN)
+    /**
+     * Creates a new problem record.
+     *
+     * <p><b>Purpose:</b> Initiates a problem investigation, stamping the caller's email as creator.
+     *
+     * <p><b>Downstream / Workflow:</b> Dispatches to {@link ProblemService#createProblem(Problem)}.
+     *
+     * @param p Validated Problem entity payload.
+     * @param a Spring Security Authentication principal.
+     * @return Created Problem entity.
+     */
     @PostMapping
     public Problem create(@Valid @RequestBody Problem p, Authentication a) {
         p.setCreatedBy(a.getName());
@@ -29,19 +53,49 @@ public class ProblemController {
         return service.createProblem(p);
     }
 
-    // GET ALL PROBLEMS - ACCESSIBLE TO ALL USERS (EMPLOYEES & ANALYSTS VIEW ALL SYSTEM PROBLEMS)
+    /**
+     * Lists all problems registered in the system.
+     *
+     * <p><b>Purpose:</b> Problem directory and queue overview.
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link ProblemService#getAllProblems()}.
+     *
+     * @param a Authentication principal.
+     * @return List of Problem entities.
+     */
     @GetMapping
     public List<Problem> list(Authentication a) {
         return service.getAllProblems();
     }
 
-    // GET SINGLE PROBLEM
+    /**
+     * Retrieves a single problem record by numeric ID.
+     *
+     * <p><b>Purpose:</b> Fetches detailed problem record.
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link ProblemService#getProblemById(Long)}.
+     *
+     * @param id Numeric problem ID.
+     * @param a Authentication principal.
+     * @return Problem entity.
+     */
     @GetMapping("/{id}")
     public Problem get(@PathVariable Long id, Authentication a) {
         return service.getProblemById(id);
     }
 
-    // MANAGEMENT - ASSIGN ANALYST / ENGINEER / CATEGORY / PRIORITY
+    /**
+     * Updates problem management triage attributes (category, priority, analyst, engineer).
+     *
+     * <p><b>Purpose:</b> Manager triage and work allocation.
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link ProblemService#managerUpdate(Long, String, String, String, String)}.
+     *
+     * @param id Problem ID.
+     * @param body JSON map of attributes.
+     * @param a Authentication principal.
+     * @return Updated Problem.
+     */
     @PutMapping("/{id}/management")
     public Problem management(
             @PathVariable Long id,
@@ -56,7 +110,18 @@ public class ProblemController {
                 body.get("assignedEngineer"));
     }
 
-    // INVESTIGATION & ROOT CAUSE ANALYSIS
+    /**
+     * Records problem investigation notes, root-cause findings, workarounds, and known errors.
+     *
+     * <p><b>Purpose:</b> Analyst investigation workflow.
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link ProblemService#analystUpdate(Long, String, String, String, String, String)}.
+     *
+     * @param id Problem ID.
+     * @param body JSON map with notes, rootCause, workaround, knownError, status.
+     * @param a Authentication principal.
+     * @return Updated Problem.
+     */
     @PutMapping("/{id}/investigation")
     public Problem investigation(
             @PathVariable Long id,
@@ -81,7 +146,18 @@ public class ProblemController {
                 status);
     }
 
-    // TECHNICAL WORK & RESOLUTION
+    /**
+     * Records technical resolution notes and marks solution progress.
+     *
+     * <p><b>Purpose:</b> Technical support engineer resolution workflow.
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link ProblemService#engineerUpdate(Long, String, String, String)}.
+     *
+     * @param id Problem ID.
+     * @param body JSON map with technicalNotes, resolution, status.
+     * @param a Authentication principal.
+     * @return Updated Problem.
+     */
     @PutMapping("/{id}/technical-work")
     public Problem technical(
             @PathVariable Long id,
@@ -104,7 +180,19 @@ public class ProblemController {
                 status);
     }
 
-    // UPDATE LIFECYCLE STATUS
+    /**
+     * Updates the problem's lifecycle status.
+     *
+     * <p><b>Purpose:</b> Manages transitions across valid ITIL status values (OPEN, ASSIGNED, INVESTIGATION,
+     * ROOT_CAUSE_IDENTIFIED, SOLUTION_IN_PROGRESS, RESOLVED, CLOSED).
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link ProblemService#managerStatus(Long, String)}.
+     *
+     * @param id Problem ID.
+     * @param body JSON body containing "status".
+     * @param a Authentication principal.
+     * @return Updated Problem entity.
+     */
     @PutMapping("/{id}/status")
     public Problem status(
             @PathVariable Long id,
@@ -124,7 +212,17 @@ public class ProblemController {
         return service.managerStatus(id, s);
     }
 
-    // DELETE PROBLEM - ADMIN ONLY
+    /**
+     * Deletes a problem record.
+     *
+     * <p><b>Purpose:</b> Administrative removal of problem records.
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link ProblemService#deleteProblem(Long)}.
+     *
+     * @param id Problem ID.
+     * @param a Authentication principal.
+     * @return Confirmation message map.
+     */
     @DeleteMapping("/{id}")
     public Map<String, String> delete(
             @PathVariable Long id,

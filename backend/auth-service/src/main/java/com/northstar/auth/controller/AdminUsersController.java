@@ -23,6 +23,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.beans.factory.annotation.Value;
 
+/**
+ * Administrative REST controller for managing portal users, role assignments, and testing impersonation.
+ *
+ * <p><b>Purpose:</b> Restricted to users with the {@code ROLE_MANAGER_ADMIN} authority. Provides endpoints to
+ * list all registered users, create pre-configured users, grant/modify roles and departments, and start local impersonation sessions.
+ *
+ * <p><b>Downstream / Workflow:</b> Intercepts requests to {@code /api/auth/admin/users/**}, enforces method security
+ * via {@code @PreAuthorize}, and delegates to {@link AuthService}.
+ */
 @RestController
 @RequestMapping("/api/auth/admin/users")
 @PreAuthorize("hasRole('MANAGER_ADMIN')")
@@ -30,15 +39,55 @@ public class AdminUsersController {
     private final AuthService auth;
     private final boolean impersonationEnabled;
 
+    /**
+     * Constructs the AdminUsersController.
+     *
+     * <p><b>Purpose:</b> Injects the AuthService and the impersonation configuration flag.
+     *
+     * <p><b>Downstream / Workflow:</b> Initialized on startup by Spring.
+     *
+     * @param auth The AuthService.
+     * @param impersonationEnabled Flag indicating whether impersonation is enabled in this environment.
+     */
     public AdminUsersController(AuthService auth,@Value("${portal.impersonation.enabled:false}") boolean impersonationEnabled) { this.auth = auth; this.impersonationEnabled=impersonationEnabled; }
 
+    /**
+     * Lists all registered portal users.
+     *
+     * <p><b>Purpose:</b> Fetches all users for the administrative directory.
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link AuthService#listUsers()}.
+     *
+     * @return List of UserSummary DTOs.
+     */
     @GetMapping
     public List<UserSummary> users() { return auth.listUsers(); }
 
+    /**
+     * Creates an active portal user with predefined role and department.
+     *
+     * <p><b>Purpose:</b> Administrator user onboarding.
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link AuthService#createUser(AdminUserCreateInput)}. Returns HTTP 201 Created.
+     *
+     * @param input User creation payload.
+     * @return Created UserSummary.
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UserSummary createUser(@Valid @RequestBody AdminUserCreateInput input) { return auth.createUser(input); }
 
+    /**
+     * Generates a temporary impersonation JWT allowing a manager/admin to test the portal as another user.
+     *
+     * <p><b>Purpose:</b> Facilitates testing and troubleshooting without password resets.
+     *
+     * <p><b>Downstream / Workflow:</b> Verified against {@code impersonationEnabled} flag, calls {@link AuthService#impersonate(UUID, UUID)}.
+     *
+     * @param id Target user UUID to impersonate.
+     * @param jwt Caller's JWT token.
+     * @return TokenResponse containing impersonation JWT.
+     */
     @PostMapping("/{id}/impersonate")
     public TokenResponse impersonate(@PathVariable("id") UUID id,@AuthenticationPrincipal Jwt jwt) {
         if(!impersonationEnabled) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND,"Local user testing is disabled");
@@ -46,12 +95,36 @@ public class AdminUsersController {
         return auth.impersonate(UUID.fromString(jwt.getSubject()),id);
     }
 
+    /**
+     * Updates an existing user's role.
+     *
+     * <p><b>Purpose:</b> Assigns security role (e.g. promotes to MANAGER_ADMIN).
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link AuthService#assignRole(UUID, RoleAssignment, UUID)}.
+     *
+     * @param id Target user UUID.
+     * @param assignment Role assignment payload.
+     * @param jwt Administrator's JWT.
+     * @return Updated UserSummary.
+     */
     @PutMapping("/{id}/role")
     public UserSummary assignRole(@PathVariable("id") UUID id, @Valid @RequestBody RoleAssignment assignment,
             @AuthenticationPrincipal Jwt jwt) {
         return auth.assignRole(id, assignment, UUID.fromString(jwt.getSubject()));
     }
 
+    /**
+     * Updates an existing user's role and department.
+     *
+     * <p><b>Purpose:</b> Configures organizational access tiers and department memberships.
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link AuthService#assignAccess(UUID, AccessAssignment, UUID)}.
+     *
+     * @param id Target user UUID.
+     * @param assignment Access assignment payload.
+     * @param jwt Administrator's JWT.
+     * @return Updated UserSummary.
+     */
     @PutMapping("/{id}/access")
     public UserSummary assignAccess(@PathVariable("id") UUID id, @Valid @RequestBody AccessAssignment assignment,
             @AuthenticationPrincipal Jwt jwt) {

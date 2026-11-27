@@ -3,8 +3,8 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
@@ -23,6 +23,9 @@ import {
   AddRounded,
   SearchRounded,
   CloseRounded,
+  ArrowBackRounded,
+  ContentCopyRounded,
+  CheckRounded,
   AssignmentIndRounded,
   PsychologyRounded,
   EngineeringRounded,
@@ -89,7 +92,7 @@ export default function ProblemManagement({
   problems,
   loading,
   isManagerAdmin,
-  currentUserEmail: _currentUserEmail,
+  currentUserEmail,
   onRefresh,
   apiFetch,
   setToast,
@@ -107,6 +110,8 @@ export default function ProblemManagement({
   const [newCategory, setNewCategory] = useState('Network')
   const [newPriority, setNewPriority] = useState('MEDIUM')
   const [newDescription, setNewDescription] = useState('')
+  const [copied, setCopied] = useState(false)
+  const currentProblemNumber = 'PRB' + String(10001 + problems.length).padStart(7, '0')
 
   // Edit / Action State for Selected Problem
   const [assignAnalyst, setAssignAnalyst] = useState('')
@@ -320,6 +325,182 @@ export default function ProblemManagement({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (createOpen) {
+    return (
+      <Box className="sn-form-container">
+        {/* ServiceNow Header */}
+        <Box className="sn-form-header">
+          <Box className="sn-header-left">
+            <IconButton size="small" onClick={() => setCreateOpen(false)} title="Back" sx={{ color: '#475569', p: 0.5 }}>
+              <ArrowBackRounded fontSize="small" />
+            </IconButton>
+            <Box>
+              <Typography className="sn-title">Problem · {currentProblemNumber}</Typography>
+              <Typography className="sn-subtitle">New record · Problem Management</Typography>
+            </Box>
+          </Box>
+          <Box className="sn-header-right">
+            <Button variant="outlined" size="small" onClick={() => setCreateOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              className="sn-submit-btn"
+              disabled={submitting || !newTitle.trim()}
+              onClick={handleCreate}
+            >
+              {submitting ? <><CircularProgress size={14} sx={{ mr: 1 }} />Submitting…</> : 'Submit problem'}
+            </Button>
+          </Box>
+        </Box>
+
+        {/* Clean 2-Column Form Body */}
+        <Box className="sn-form-body">
+          <Box className="sn-form-column">
+            {/* Auto Generated ID Field */}
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Number</Typography>
+              <Box className="sn-field-input-wrap sn-number-wrap">
+                <input
+                  className="sn-input-styled sn-number-input"
+                  readOnly
+                  value={currentProblemNumber}
+                  title="Auto-generated Problem Number"
+                />
+                <IconButton
+                  size="small"
+                  className="sn-search-icon-btn"
+                  title={copied ? 'Copied!' : 'Copy Problem Number'}
+                  onClick={() => {
+                    navigator.clipboard?.writeText(currentProblemNumber)
+                    setCopied(true)
+                    window.setTimeout(() => setCopied(false), 3000)
+                  }}
+                >
+                  {copied ? <CheckRounded fontSize="small" sx={{ color: '#16a34a' }} /> : <ContentCopyRounded fontSize="small" />}
+                </IconButton>
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">
+                <span className="sn-required">* </span>Title
+              </Typography>
+              <Box className="sn-field-input-wrap">
+                <input
+                  type="text"
+                  className="sn-input-styled"
+                  placeholder="e.g. Core Network Gateway High Latency"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                />
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Category</Typography>
+              <Box className="sn-field-input-wrap">
+                <select
+                  className="sn-select-styled"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Priority</Typography>
+              <Box className="sn-field-input-wrap">
+                <select
+                  className="sn-select-styled"
+                  value={newPriority}
+                  onChange={(e) => setNewPriority(e.target.value)}
+                >
+                  {PRIORITIES.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </Box>
+            </Box>
+          </Box>
+
+          <Box className="sn-form-column">
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Reported by</Typography>
+              <Box className="sn-field-input-wrap">
+                <input
+                  type="text"
+                  className="sn-input-styled"
+                  readOnly
+                  value={currentUserEmail || 'admin@northstar.local'}
+                />
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">State</Typography>
+              <Box className="sn-field-input-wrap">
+                <input
+                  type="text"
+                  className="sn-input-styled"
+                  readOnly
+                  value="OPEN (New)"
+                />
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Impact</Typography>
+              <Box className="sn-field-input-wrap">
+                <select
+                  className="sn-select-styled"
+                  value={newPriority === 'CRITICAL' ? '1 - High' : newPriority === 'HIGH' ? '2 - Medium' : '3 - Low'}
+                  disabled
+                >
+                  <option>{newPriority === 'CRITICAL' ? '1 - High' : newPriority === 'HIGH' ? '2 - Medium' : '3 - Low'}</option>
+                </select>
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Urgency</Typography>
+              <Box className="sn-field-input-wrap">
+                <select
+                  className="sn-select-styled"
+                  value={newPriority === 'CRITICAL' ? '1 - High' : newPriority === 'HIGH' ? '2 - Medium' : '3 - Low'}
+                  disabled
+                >
+                  <option>{newPriority === 'CRITICAL' ? '1 - High' : newPriority === 'HIGH' ? '2 - Medium' : '3 - Low'}</option>
+                </select>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Full width Description and Notes */}
+        <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e2e8f0' }}>
+          <Box className="sn-field-row" sx={{ gridTemplateColumns: '140px 1fr', alignItems: 'flex-start' }}>
+            <Typography className="sn-field-label" sx={{ pt: 1 }}>Description & Symptoms</Typography>
+            <Box className="sn-field-input-wrap">
+              <textarea
+                className="sn-textarea-styled"
+                rows={4}
+                placeholder="Provide context, affected services, error logs, and impact observations..."
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+              />
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    )
   }
 
   return (
@@ -593,78 +774,6 @@ export default function ProblemManagement({
           </Box>
         )}
       </Paper>
-
-      {/* CREATE PROBLEM DIALOG */}
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: '#0f172a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Report a Problem
-          <IconButton size="small" onClick={() => setCreateOpen(false)}>
-            <CloseRounded />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
-          <TextField
-            label="Problem Title"
-            required
-            fullWidth
-            size="small"
-            placeholder="e.g. Core Network Gateway High Latency"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-          />
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-            <Box>
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#475569', mb: 0.5 }}>Category</Typography>
-              <Select
-                size="small"
-                fullWidth
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-              >
-                {CATEGORIES.map((c) => (
-                  <MenuItem key={c} value={c}>{c}</MenuItem>
-                ))}
-              </Select>
-            </Box>
-            <Box>
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: '#475569', mb: 0.5 }}>Priority</Typography>
-              <Select
-                size="small"
-                fullWidth
-                value={newPriority}
-                onChange={(e) => setNewPriority(e.target.value)}
-              >
-                {PRIORITIES.map((p) => (
-                  <MenuItem key={p} value={p}>{p}</MenuItem>
-                ))}
-              </Select>
-            </Box>
-          </Box>
-          <TextField
-            label="Problem Description & Symptoms"
-            multiline
-            rows={4}
-            fullWidth
-            size="small"
-            placeholder="Provide context, affected services, error logs, and impact observations..."
-            value={newDescription}
-            onChange={(e) => setNewDescription(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setCreateOpen(false)} sx={{ textTransform: 'none' }}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleCreate}
-            disabled={submitting || !newTitle.trim()}
-            sx={{ bgcolor: '#0f766e', '&:hover': { bgcolor: '#115e59' }, textTransform: 'none', fontWeight: 600 }}
-          >
-            {submitting ? 'Creating...' : 'Submit problem'}
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* PROBLEM DETAIL DIALOG */}
       {detailProblem && (

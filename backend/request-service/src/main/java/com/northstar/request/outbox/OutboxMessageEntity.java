@@ -8,6 +8,16 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * JPA entity implementing the Transactional Outbox pattern in {@code outbox_messages}.
+ *
+ * <p><b>Purpose:</b> Stores outbound domain events in the same database transaction as the service request.
+ * Contains aggregate ID, event type, JSON payload, attempt counts, retry scheduling timestamps,
+ * distributed locking timestamps, and publishing/dead-letter markers.
+ *
+ * <p><b>Downstream / Workflow:</b> Saved by {@link com.northstar.request.service.RequestSubmissionWriter}.
+ * Polled and relayed to RabbitMQ by {@link OutboxRelay}.
+ */
 @Entity
 @Table(name = "outbox_messages")
 public class OutboxMessageEntity {

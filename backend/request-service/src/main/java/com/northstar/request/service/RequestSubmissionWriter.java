@@ -12,11 +12,27 @@ import com.northstar.request.repository.ApprovalRepository;
 import com.northstar.request.repository.RequestHistoryRepository;
 import com.northstar.request.entity.ApprovalEntity;
 import com.northstar.request.entity.RequestHistoryEntity;
+import com.northstar.request.integration.ServiceNowRequestClient;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Transactional writer component persisting service requests, initial approvals, audit history, and outbox messages.
+ *
+ * <p><b>Purpose:</b> Implements the core transactional boundary for request submission. In a single MySQL transaction:
+ * <ol>
+ *   <li>Saves {@link ServiceRequestEntity} with idempotency key and initial status.</li>
+ *   <li>Saves {@link ApprovalEntity} if an approver is specified.</li>
+ *   <li>Saves initial {@link RequestHistoryEntity} audit entry.</li>
+ *   <li>Saves {@link OutboxMessageEntity} containing the domain event for asynchronous RabbitMQ relay.</li>
+ * </ol>
+ *
+ * <p><b>Downstream / Workflow:</b> Called by {@link RequestSubmissionService#submit}.
+ */
 @Service
 public class RequestSubmissionWriter {
     private final ServiceRequestRepository requests;
@@ -24,12 +40,33 @@ public class RequestSubmissionWriter {
     private final ObjectMapper mapper;
     private final ApprovalRepository approvals;
     private final RequestHistoryRepository history;
+    private final ServiceNowRequestClient serviceNowClient;
 
+    /**
+     * Constructs RequestSubmissionWriter.
+     *
+     * @param requests Service request repository.
+     * @param outbox Outbox message repository.
+     * @param mapper Jackson ObjectMapper.
+     * @param approvals Approval repository.
+     * @param history Audit history repository.
+     * @param serviceNowClient ServiceNow request client.
+     */
     public RequestSubmissionWriter(ServiceRequestRepository requests, OutboxMessageRepository outbox, ObjectMapper mapper,
-                                   ApprovalRepository approvals, RequestHistoryRepository history) {
+                                   ApprovalRepository approvals, RequestHistoryRepository history,
+                                   ServiceNowRequestClient serviceNowClient) {
         this.requests = requests; this.outbox = outbox; this.mapper = mapper; this.approvals = approvals; this.history = history;
+        this.serviceNowClient = serviceNowClient;
     }
 
+    /**
+     * Atomically creates the request entity, approval record, audit history row, and outbox event.
+     *
+     * @param idempotencyKey Client idempotency key.
+     * @param requesterId Requester employee ID.
+     * @param input Request form inputs.
+     * @return RequestSubmissionResponse DTO.
+     */
     @Transactional
     public RequestSubmissionResponse create(String idempotencyKey, String requesterId, RequestSubmission input) {
         String fieldsJson;
@@ -42,6 +79,23 @@ public class RequestSubmissionWriter {
         if (customNum != null && !customNum.isBlank()) {
             entity.setServiceNowNumber(customNum.trim());
         }
+
+        // Attempt live synchronization with external ServiceNow Cloud instance
+        try {
+            Map<String, Object> snPayload = new HashMap<>();
+            snPayload.put("short_description", input.serviceName().trim());
+            snPayload.put("description", input.description().trim());
+            snPayload.put("special_instructions", "Requested for: " + input.requestedForId().trim() + ", Approver: " + input.approverId().trim());
+
+            Map<String, Object> snResponse = serviceNowClient.createRequest(snPayload);
+            if (snResponse != null && snResponse.get("number") != null) {
+                entity.setServiceNowNumber(String.valueOf(snResponse.get("number")));
+                entity.setExternalLink(String.valueOf(snResponse.get("sys_id")), "servicenow");
+            }
+        } catch (Exception ignored) {
+            // Graceful fallback to local numbering
+        }
+
         entity = requests.saveAndFlush(entity);
         if (entity.getApproverId() != null && !entity.getApproverId().isBlank()) {
             approvals.save(new ApprovalEntity(entity.getId(), entity.getApproverId()));

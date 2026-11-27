@@ -1,5 +1,16 @@
 package com.itsm.changemanagement.controller;
 import com.itsm.changemanagement.entity.*;import com.itsm.changemanagement.dto.CreateChangeRequestDTO;import com.fasterxml.jackson.databind.ObjectMapper;import com.itsm.changemanagement.service.ChangeService;import com.itsm.changemanagement.repository.*;import org.springframework.web.bind.annotation.*;import org.springframework.http.*;import org.springframework.data.domain.*;import jakarta.validation.Valid;import jakarta.validation.constraints.*;import java.util.*;import java.time.*;
+
+/**
+ * REST controller exposing endpoints for the entire ITIL Change Management lifecycle.
+ *
+ * <p><b>Purpose:</b> Provides endpoints for RFC creation, updates, submission, risk assessment, role assignments,
+ * CAB review, approvals/rejections, scheduling, implementation progress, test validation, rollback handling,
+ * closure, cancellation, audit history, and dashboard metrics.
+ *
+ * <p><b>Downstream / Workflow:</b> Receives client HTTP requests under {@code /api/changes/**} and delegates
+ * lifecycle transitions to {@link ChangeService}.
+ */
 @RestController @RequestMapping("/api/changes") public class ChangeController {private final ChangeService s;private final ChangeHistoryRepository h;private final ChangeRequestRepository r;private final ObjectMapper mapper;public ChangeController(ChangeService s,ChangeHistoryRepository h,ChangeRequestRepository r,ObjectMapper mapper){this.s=s;this.h=h;this.r=r;this.mapper=mapper;}
  @PostMapping public ResponseEntity<?> create(@Valid @RequestBody CreateChangeRequestDTO dto){return ResponseEntity.status(201).body(s.create(mapper.convertValue(dto,Map.class)));}@GetMapping public Page<ChangeRequest> all(@RequestParam(required=false)String search,@RequestParam(required=false)ChangeStatus status,@RequestParam(required=false)ChangeType type,Pageable p){return s.search(search,status,type,p);}@GetMapping("/{id}")public ChangeRequest get(@PathVariable Long id){return s.get(id);}@PutMapping("/{id}")public ChangeRequest update(@PathVariable Long id,@RequestBody Map<String,Object>b){return s.update(id,b);}@DeleteMapping("/{id}")public ResponseEntity<?> delete(@PathVariable Long id){ChangeRequest c=s.get(id);if(c.getStatus()!=ChangeStatus.DRAFT)throw new com.itsm.changemanagement.exception.ApiExceptions.Conflict("Only DRAFT can be deleted");r.delete(c);return ResponseEntity.noContent().build();}
  @GetMapping("/my-changes")public List<ChangeRequest> mine(@RequestParam String email){return r.findByRequesterEmailIgnoreCase(email);}@GetMapping("/status/{status}")public List<ChangeRequest> status(@PathVariable ChangeStatus status){return r.findByStatus(status);}@GetMapping("/type/{type}")public List<ChangeRequest> type(@PathVariable ChangeType type){return r.findByChangeType(type);}

@@ -1,8 +1,69 @@
 package com.itsm.changemanagement.service;
-import com.itsm.changemanagement.entity.*;import com.itsm.changemanagement.repository.*;import com.itsm.changemanagement.exception.ApiExceptions;import org.springframework.stereotype.Service;import org.springframework.transaction.annotation.Transactional;import org.springframework.data.domain.*;import java.time.*;import java.util.*;
-@Service public class ChangeService {private final ChangeRequestRepository repo;private final ChangeHistoryRepository history;public ChangeService(ChangeRequestRepository r,ChangeHistoryRepository h){repo=r;history=h;}
- public ChangeRequest get(Long id){return repo.findById(id).orElseThrow(()->new ApiExceptions.NotFound("Change not found: "+id));}
- @Transactional public ChangeRequest create(Map<String,Object> m){ChangeRequest c=new ChangeRequest();apply(c,m,true);c.setChangeNumber("TMP-"+UUID.randomUUID().toString().substring(0,20));c.setStatus(ChangeStatus.DRAFT);ChangeRequest saved=repo.save(c);saved.setChangeNumber("CHG-"+String.format("%05d",saved.getId()));saved=repo.save(saved);log(saved,null,"DRAFT","CREATED",str(m,"requestedBy"),"Change request created");return saved;}
+import com.itsm.changemanagement.entity.*;
+import com.itsm.changemanagement.repository.*;
+import com.itsm.changemanagement.exception.ApiExceptions;
+import com.itsm.changemanagement.integration.ServiceNowChangeClient;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.*;
+import java.time.*;
+import java.util.*;
+
+/**
+ * Core business service implementing ITIL Change Enablement lifecycles.
+ *
+ * <p><b>Purpose:</b> Enforces the state machine for Change Requests (Draft, Submitted, Assessment, Under Review,
+ * Pending Approval, Approved, Scheduled, In Progress, Implemented, Validated, Closed, Rolled Back).
+ * Manages RFC intake, risk assessments, CAB reviews, approvals, implementation progress tracking, rollbacks,
+ * and immutable change history audit logging.
+ *
+ * <p><b>Downstream / Workflow:</b> Injected into {@link com.itsm.changemanagement.controller.ChangeController}.
+ * Interacts with {@link ChangeRequestRepository} and {@link ChangeHistoryRepository}.
+ */
+@Service
+public class ChangeService {
+    private final ChangeRequestRepository repo;
+    private final ChangeHistoryRepository history;
+    private final ServiceNowChangeClient serviceNowClient;
+
+    public ChangeService(ChangeRequestRepository r, ChangeHistoryRepository h, ServiceNowChangeClient s) {
+        repo = r;
+        history = h;
+        serviceNowClient = s;
+    }
+
+    public ChangeRequest get(Long id) {
+        return repo.findById(id).orElseThrow(() -> new ApiExceptions.NotFound("Change not found: " + id));
+    }
+
+    @Transactional
+    public ChangeRequest create(Map<String, Object> m) {
+        ChangeRequest c = new ChangeRequest();
+        apply(c, m, true);
+        c.setChangeNumber("TMP-" + UUID.randomUUID().toString().substring(0, 20));
+        c.setStatus(ChangeStatus.DRAFT);
+        ChangeRequest saved = repo.save(c);
+
+        String chgNum = "CHG-" + String.format("%05d", saved.getId());
+        try {
+            Map<String, Object> snPayload = new HashMap<>();
+            snPayload.put("short_description", saved.getShortDescription());
+            snPayload.put("description", saved.getDetailedDescription());
+            snPayload.put("justification", saved.getBusinessJustification());
+            snPayload.put("category", saved.getCategory() != null ? saved.getCategory().name() : "Other");
+            Map<String, Object> snResponse = serviceNowClient.createChange(snPayload);
+            if (snResponse != null && snResponse.get("number") != null) {
+                chgNum = String.valueOf(snResponse.get("number"));
+            }
+        } catch (Exception ignored) {
+            // Graceful fallback to local CHG numbering
+        }
+
+        saved.setChangeNumber(chgNum);
+        saved = repo.save(saved);
+        log(saved, null, "DRAFT", "CREATED", str(m, "requestedBy"), "Change request created");
+        return saved;
+    }
  private String str(Map<String,Object> m,String k){Object v=m.get(k);return v==null?null:String.valueOf(v);}private void apply(ChangeRequest c,Map<String,Object> m,boolean required){set(m,"shortDescription",c::setShortDescription);set(m,"detailedDescription",c::setDetailedDescription);set(m,"requestedBy",c::setRequestedBy);set(m,"requesterEmail",c::setRequesterEmail);set(m,"department",c::setDepartment);set(m,"impact",c::setImpact);set(m,"affectedCi",c::setAffectedCi);set(m,"businessJustification",c::setBusinessJustification);set(m,"implementationPlan",c::setImplementationPlan);set(m,"rollbackPlan",c::setRollbackPlan);set(m,"testPlan",c::setTestPlan);set(m,"riskDescription",c::setRiskDescription);set(m,"businessImpact",c::setBusinessImpact);set(m,"technicalImpact",c::setTechnicalImpact);set(m,"riskMitigationPlan",c::setRiskMitigationPlan);    if(m.get("changeType")!=null)c.setChangeType(ChangeType.valueOf(str(m,"changeType").toUpperCase()));
     if(m.get("category")!=null)c.setCategory(ChangeCategory.valueOf(str(m,"category").toUpperCase()));
     if(m.get("priority")!=null)c.setPriority(Priority.valueOf(str(m,"priority").toUpperCase()));

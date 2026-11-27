@@ -37,7 +37,7 @@ services:
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@northstar.local}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?Set BOOTSTRAP_ADMIN_PASSWORD in backend/.env}
       BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-Northstar Administrator}
-      PORTAL_IMPERSONATION_ENABLED: ${PORTAL_IMPERSONATION_ENABLED:-false}
+      PORTAL_IMPERSONATION_ENABLED: ${PORTAL_IMPERSONATION_ENABLED:-true}
     depends_on:
       service-registry:
         condition: service_started

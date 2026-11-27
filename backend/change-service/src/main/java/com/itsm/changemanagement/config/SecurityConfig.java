@@ -13,12 +13,29 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Security and CORS configuration for the Change Service.
+ *
+ * <p><b>Purpose:</b> Configures open/protected access modes (via {@code app.security.open-access}),
+ * OAuth2 Resource Server JWT verification, and CORS policies for web clients.
+ *
+ * <p><b>Downstream / Workflow:</b> Filter chain applied to every HTTP exchange to {@code /api/changes/**}.
+ */
 @Configuration
 public class SecurityConfig {
 
     /**
-     * app.security.open-access=true  -> every endpoint is reachable without a token (local/dev/demo).
-     * app.security.open-access=false -> every endpoint except health/Swagger requires a valid JWT.
+     * Builds the HTTP security filter chain.
+     *
+     * <p><b>Purpose:</b> Permits all routes when openAccess is true, or enforces OAuth2 Bearer token checking
+     * when openAccess is false while exempting health and Swagger routes.
+     *
+     * <p><b>Downstream / Workflow:</b> Applied to each HTTP request.
+     *
+     * @param http HttpSecurity builder.
+     * @param openAccess Config property toggling open demo access vs token verification.
+     * @return Built SecurityFilterChain.
+     * @throws Exception on configuration failure.
      */
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http,
@@ -35,7 +52,16 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /** Lets browser front-ends (React, Angular, Swagger UI) call the API from any configured origin. */
+    /**
+     * Configures cross-origin resource sharing (CORS) sources.
+     *
+     * <p><b>Purpose:</b> Permits cross-origin browser requests from React/dev origins.
+     *
+     * <p><b>Downstream / Workflow:</b> Registered on all path patterns ({@code /**}).
+     *
+     * @param origins Comma-delimited list of allowed origin patterns.
+     * @return CorsConfigurationSource bean.
+     */
     @Bean
     CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origins:*}") String origins) {
         List<String> patterns = Arrays.stream(origins.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();

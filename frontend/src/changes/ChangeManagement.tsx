@@ -21,12 +21,21 @@ import {
   Stack,
   FormControl,
   InputLabel,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
 } from '@mui/material'
 import {
   PublishedWithChangesRounded,
   AddRounded,
   SearchRounded,
   CloseRounded,
+  ArrowBackRounded,
+  ContentCopyRounded,
+  CheckRounded,
   RefreshRounded,
   ArrowForwardRounded,
   CheckCircleOutlineRounded,
@@ -151,6 +160,8 @@ const initialForm = {
   implementationPlan: '',
   rollbackPlan: '',
   testPlan: '',
+  plannedStartDate: '',
+  plannedEndDate: '',
 }
 
 const statusColor = (s: string) => {
@@ -229,6 +240,8 @@ export default function ChangeManagement({
   const [history, setHistory] = useState<ChangeHistoryRecord[]>([])
   const [activeTab, setActiveTab] = useState<'details' | 'plans' | 'lifecycle' | 'history'>('details')
   const [actionComments, setActionComments] = useState('')
+  const [copied, setCopied] = useState(false)
+  const currentChangeNumber = 'CHG' + String(10001 + changes.length).padStart(7, '0')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -360,6 +373,303 @@ export default function ChangeManagement({
   const pendingApprovalCount = stats.PENDING_APPROVAL || 0
   const inProgressCount = stats.IN_PROGRESS || 0
   const closedCount = stats.CLOSED || 0
+
+  if (createModalOpen) {
+    return (
+      <Box className="sn-form-container">
+        {/* ServiceNow Header */}
+        <Box className="sn-form-header">
+          <Box className="sn-header-left">
+            <IconButton size="small" onClick={() => setCreateModalOpen(false)} title="Back" sx={{ color: '#475569', p: 0.5 }}>
+              <ArrowBackRounded fontSize="small" />
+            </IconButton>
+            <Box>
+              <Typography className="sn-title">Change Request · {currentChangeNumber}</Typography>
+              <Typography className="sn-subtitle">New record · Change Enablement (CAB)</Typography>
+            </Box>
+          </Box>
+          <Box className="sn-header-right">
+            <Button variant="outlined" size="small" onClick={() => setCreateModalOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              className="sn-submit-btn"
+              disabled={submitting || !form.shortDescription.trim() || !form.detailedDescription.trim()}
+              onClick={handleCreate}
+            >
+              {submitting ? <><CircularProgress size={14} sx={{ mr: 1 }} />Submitting…</> : 'Submit Change Draft'}
+            </Button>
+          </Box>
+        </Box>
+
+        {/* Clean 2-Column Form Body */}
+        <Box className="sn-form-body">
+          <Box className="sn-form-column">
+            {/* Auto Generated ID Field */}
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Number</Typography>
+              <Box className="sn-field-input-wrap sn-number-wrap">
+                <input
+                  className="sn-input-styled sn-number-input"
+                  readOnly
+                  value={currentChangeNumber}
+                  title="Auto-generated Change Number"
+                />
+                <IconButton
+                  size="small"
+                  className="sn-search-icon-btn"
+                  title={copied ? 'Copied!' : 'Copy Change Number'}
+                  onClick={() => {
+                    navigator.clipboard?.writeText(currentChangeNumber)
+                    setCopied(true)
+                    window.setTimeout(() => setCopied(false), 3000)
+                  }}
+                >
+                  {copied ? <CheckRounded fontSize="small" sx={{ color: '#16a34a' }} /> : <ContentCopyRounded fontSize="small" />}
+                </IconButton>
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Change Type</Typography>
+              <Box className="sn-field-input-wrap">
+                <select
+                  className="sn-select-styled"
+                  value={form.changeType}
+                  onChange={(e) => setForm({ ...form, changeType: e.target.value })}
+                >
+                  <option value="NORMAL">Normal (CAB approval required)</option>
+                  <option value="STANDARD">Standard (Pre-authorized, low risk)</option>
+                  <option value="EMERGENCY">Emergency (Urgent fix/downtime prevention)</option>
+                </select>
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Category</Typography>
+              <Box className="sn-field-input-wrap">
+                <select
+                  className="sn-select-styled"
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                >
+                  <option value="APPLICATION">Application</option>
+                  <option value="DATABASE">Database</option>
+                  <option value="INFRASTRUCTURE">Infrastructure</option>
+                  <option value="NETWORK">Network</option>
+                  <option value="SECURITY">Security</option>
+                  <option value="HARDWARE">Hardware</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Risk Level</Typography>
+              <Box className="sn-field-input-wrap">
+                <select
+                  className="sn-select-styled"
+                  value={form.riskLevel}
+                  onChange={(e) => setForm({ ...form, riskLevel: e.target.value })}
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Priority</Typography>
+              <Box className="sn-field-input-wrap">
+                <select
+                  className="sn-select-styled"
+                  value={form.priority}
+                  onChange={(e) => setForm({ ...form, priority: e.target.value })}
+                >
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Affected CI / Asset</Typography>
+              <Box className="sn-field-input-wrap">
+                <input
+                  type="text"
+                  className="sn-input-styled"
+                  placeholder="e.g. Core Banking DB Cluster"
+                  value={form.affectedCi}
+                  onChange={(e) => setForm({ ...form, affectedCi: e.target.value })}
+                />
+              </Box>
+            </Box>
+          </Box>
+
+          <Box className="sn-form-column">
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Requested By</Typography>
+              <Box className="sn-field-input-wrap">
+                <input
+                  type="text"
+                  className="sn-input-styled"
+                  value={form.requestedBy}
+                  onChange={(e) => setForm({ ...form, requestedBy: e.target.value })}
+                />
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Requester Email</Typography>
+              <Box className="sn-field-input-wrap">
+                <input
+                  type="email"
+                  className="sn-input-styled"
+                  value={form.requesterEmail}
+                  onChange={(e) => setForm({ ...form, requesterEmail: e.target.value })}
+                />
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Department</Typography>
+              <Box className="sn-field-input-wrap">
+                <input
+                  type="text"
+                  className="sn-input-styled"
+                  value={form.department}
+                  onChange={(e) => setForm({ ...form, department: e.target.value })}
+                />
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">State</Typography>
+              <Box className="sn-field-input-wrap">
+                <input
+                  type="text"
+                  className="sn-input-styled"
+                  readOnly
+                  value="DRAFT"
+                />
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Planned Start</Typography>
+              <Box className="sn-field-input-wrap">
+                <input
+                  type="datetime-local"
+                  className="sn-input-styled"
+                  value={form.plannedStartDate}
+                  onChange={(e) => setForm({ ...form, plannedStartDate: e.target.value })}
+                />
+              </Box>
+            </Box>
+
+            <Box className="sn-field-row">
+              <Typography className="sn-field-label">Planned End</Typography>
+              <Box className="sn-field-input-wrap">
+                <input
+                  type="datetime-local"
+                  className="sn-input-styled"
+                  value={form.plannedEndDate}
+                  onChange={(e) => setForm({ ...form, plannedEndDate: e.target.value })}
+                />
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Detailed Plans & Justification */}
+        <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Box className="sn-field-row" sx={{ gridTemplateColumns: '140px 1fr', alignItems: 'center' }}>
+            <Typography className="sn-field-label"><span className="sn-required">* </span>Short Description</Typography>
+            <Box className="sn-field-input-wrap">
+              <input
+                type="text"
+                className="sn-input-styled"
+                placeholder="e.g. Upgrade PostgreSQL production cluster to v16.2"
+                value={form.shortDescription}
+                onChange={(e) => setForm({ ...form, shortDescription: e.target.value })}
+              />
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row" sx={{ gridTemplateColumns: '140px 1fr', alignItems: 'flex-start' }}>
+            <Typography className="sn-field-label" sx={{ pt: 1 }}><span className="sn-required">* </span>Detailed Description</Typography>
+            <Box className="sn-field-input-wrap">
+              <textarea
+                className="sn-textarea-styled"
+                rows={3}
+                placeholder="Comprehensive details of what is being changed and why..."
+                value={form.detailedDescription}
+                onChange={(e) => setForm({ ...form, detailedDescription: e.target.value })}
+              />
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row" sx={{ gridTemplateColumns: '140px 1fr', alignItems: 'flex-start' }}>
+            <Typography className="sn-field-label" sx={{ pt: 1 }}>Business Justification</Typography>
+            <Box className="sn-field-input-wrap">
+              <textarea
+                className="sn-textarea-styled"
+                rows={2}
+                placeholder="Why is this change necessary? What business problem does it solve?"
+                value={form.businessJustification}
+                onChange={(e) => setForm({ ...form, businessJustification: e.target.value })}
+              />
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row" sx={{ gridTemplateColumns: '140px 1fr', alignItems: 'flex-start' }}>
+            <Typography className="sn-field-label" sx={{ pt: 1 }}>Implementation Plan</Typography>
+            <Box className="sn-field-input-wrap">
+              <textarea
+                className="sn-textarea-styled"
+                rows={2}
+                placeholder="Step-by-step rollout sequence..."
+                value={form.implementationPlan}
+                onChange={(e) => setForm({ ...form, implementationPlan: e.target.value })}
+              />
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row" sx={{ gridTemplateColumns: '140px 1fr', alignItems: 'flex-start' }}>
+            <Typography className="sn-field-label" sx={{ pt: 1 }}>Rollback Plan</Typography>
+            <Box className="sn-field-input-wrap">
+              <textarea
+                className="sn-textarea-styled"
+                rows={2}
+                placeholder="Procedure to revert changes if validation fails..."
+                value={form.rollbackPlan}
+                onChange={(e) => setForm({ ...form, rollbackPlan: e.target.value })}
+              />
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row" sx={{ gridTemplateColumns: '140px 1fr', alignItems: 'flex-start' }}>
+            <Typography className="sn-field-label" sx={{ pt: 1 }}>Test Plan</Typography>
+            <Box className="sn-field-input-wrap">
+              <textarea
+                className="sn-textarea-styled"
+                rows={2}
+                placeholder="Verification checklist and success criteria..."
+                value={form.testPlan}
+                onChange={(e) => setForm({ ...form, testPlan: e.target.value })}
+              />
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    )
+  }
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 1400, margin: '0 auto' }}>
@@ -547,54 +857,63 @@ export default function ChangeManagement({
             </Button>
           </Box>
         ) : (
-          <Box sx={{ overflowX: 'auto' }}>
-            <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
-              <Box component="thead">
-                <Box component="tr" sx={{ borderBottom: '2px solid #f1f5f9', textAlign: 'left' }}>
-                  <Box component="th" sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#64748b' }}>
-                    CHANGE
-                  </Box>
-                  <Box component="th" sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#64748b' }}>
-                    REQUESTED BY
-                  </Box>
-                  <Box component="th" sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#64748b' }}>
-                    TYPE
-                  </Box>
-                  <Box component="th" sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#64748b' }}>
-                    RISK
-                  </Box>
-                  <Box component="th" sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#64748b' }}>
-                    PRIORITY
-                  </Box>
-                  <Box component="th" sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#64748b' }}>
-                    STATUS
-                  </Box>
-                  <Box component="th" sx={{ py: 1.5, px: 2, width: 40 }} />
-                </Box>
-              </Box>
-              <Box component="tbody">
+          <TableContainer sx={{ overflowX: 'auto', borderRadius: 2 }}>
+            <Table sx={{ minWidth: 900, borderCollapse: 'collapse' }}>
+              <TableHead>
+                <TableRow sx={{ bgcolor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                  <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Change
+                  </TableCell>
+                  <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Requested By
+                  </TableCell>
+                  <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Type
+                  </TableCell>
+                  <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Risk
+                  </TableCell>
+                  <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Priority
+                  </TableCell>
+                  <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Status
+                  </TableCell>
+                  <TableCell align="right" sx={{ py: 1.5, px: 2, width: 48 }} />
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {filteredChanges.map((change) => (
-                  <Box
-                    component="tr"
+                  <TableRow
                     key={change.id}
+                    hover
                     onClick={() => void openDetail(change)}
                     sx={{
                       cursor: 'pointer',
                       borderBottom: '1px solid #f1f5f9',
-                      transition: 'background 0.15s ease',
+                      transition: 'background-color 0.15s ease',
                       '&:hover': { bgcolor: '#f8fafc' },
                     }}
                   >
-                    <Box sx={{ py: 2, px: 2 }}>
-                      <Typography sx={{ fontWeight: 700, color: '#1e3a8a', fontSize: 13 }}>
-                        {change.changeNumber}
-                      </Typography>
+                    <TableCell sx={{ py: 2, px: 2, maxWidth: 360 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Typography sx={{ fontWeight: 700, color: '#1d4ed8', fontSize: 13, fontFamily: 'monospace' }}>
+                          {change.changeNumber}
+                        </Typography>
+                        {change.affectedCi && (
+                          <Chip
+                            size="small"
+                            label={`CI: ${change.affectedCi}`}
+                            sx={{ height: 20, fontSize: 10, fontWeight: 600, bgcolor: '#f1f5f9', color: '#475569' }}
+                          />
+                        )}
+                      </Box>
                       <Typography
                         sx={{
                           fontWeight: 600,
                           fontSize: 14,
-                          color: '#1e293b',
-                          maxWidth: 340,
+                          color: '#0f172a',
+                          lineHeight: 1.3,
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
@@ -602,21 +921,18 @@ export default function ChangeManagement({
                       >
                         {change.shortDescription}
                       </Typography>
-                      {change.affectedCi && (
-                        <Typography variant="caption" sx={{ color: '#64748b' }}>
-                          CI: {change.affectedCi}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Box sx={{ py: 2, px: 2 }}>
+                    </TableCell>
+
+                    <TableCell sx={{ py: 2, px: 2, whiteSpace: 'nowrap' }}>
                       <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
                         {change.requestedBy}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#64748b' }}>
-                        {change.department}
+                      <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                        {change.department || 'IT Operations'}
                       </Typography>
-                    </Box>
-                    <Box sx={{ py: 2, px: 2 }}>
+                    </TableCell>
+
+                    <TableCell sx={{ py: 2, px: 2, whiteSpace: 'nowrap' }}>
                       <Chip
                         size="small"
                         label={change.changeType}
@@ -626,10 +942,16 @@ export default function ChangeManagement({
                           fontSize: 11,
                           borderColor:
                             change.changeType === 'EMERGENCY'
-                              ? '#f87171'
+                              ? '#fca5a5'
                               : change.changeType === 'STANDARD'
-                              ? '#38bdf8'
-                              : '#94a3b8',
+                              ? '#7dd3fc'
+                              : '#cbd5e1',
+                          bgcolor:
+                            change.changeType === 'EMERGENCY'
+                              ? '#fef2f2'
+                              : change.changeType === 'STANDARD'
+                              ? '#f0f9ff'
+                              : '#f8fafc',
                           color:
                             change.changeType === 'EMERGENCY'
                               ? '#b91c1c'
@@ -638,8 +960,9 @@ export default function ChangeManagement({
                               : '#475569',
                         }}
                       />
-                    </Box>
-                    <Box sx={{ py: 2, px: 2 }}>
+                    </TableCell>
+
+                    <TableCell sx={{ py: 2, px: 2, whiteSpace: 'nowrap' }}>
                       <Chip
                         size="small"
                         label={change.riskLevel}
@@ -648,237 +971,36 @@ export default function ChangeManagement({
                           fontSize: 11,
                           bgcolor: `${riskColor(change.riskLevel)}15`,
                           color: riskColor(change.riskLevel),
+                          border: `1px solid ${riskColor(change.riskLevel)}35`,
                         }}
                       />
-                    </Box>
-                    <Box sx={{ py: 2, px: 2 }}>
+                    </TableCell>
+
+                    <TableCell sx={{ py: 2, px: 2, whiteSpace: 'nowrap' }}>
                       <Typography sx={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
                         {change.priority}
                       </Typography>
-                    </Box>
-                    <Box sx={{ py: 2, px: 2 }}>
+                    </TableCell>
+
+                    <TableCell sx={{ py: 2, px: 2, whiteSpace: 'nowrap' }}>
                       <Chip
                         size="small"
                         color={statusColor(change.status)}
                         label={change.status?.replace(/_/g, ' ')}
                         sx={{ fontWeight: 700, fontSize: 11 }}
                       />
-                    </Box>
-                    <Box sx={{ py: 2, px: 2, color: '#94a3b8' }}>
+                    </TableCell>
+
+                    <TableCell align="right" sx={{ py: 2, px: 2, color: '#94a3b8' }}>
                       <ArrowForwardRounded sx={{ fontSize: 18 }} />
-                    </Box>
-                  </Box>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </Box>
-            </Box>
-          </Box>
+              </TableBody>
+            </Table>
+          </TableContainer>
         )}
       </Paper>
-
-      {/* CREATE CHANGE REQUEST DIALOG */}
-      <Dialog
-        open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        fullWidth
-        maxWidth="md"
-      >
-        <Box component="form" onSubmit={handleCreate}>
-          <DialogTitle sx={{ fontWeight: 800, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <PublishedWithChangesRounded sx={{ color: '#2563eb' }} />
-              Create Change Request
-            </Box>
-            <IconButton size="small" onClick={() => setCreateModalOpen(false)}>
-              <CloseRounded />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent dividers>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-              <Box sx={{ gridColumn: '1 / -1' }}>
-                <TextField
-                  required
-                  fullWidth
-                  label="Short Description"
-                  placeholder="e.g. Upgrade PostgreSQL production cluster to v16.2"
-                  value={form.shortDescription}
-                  onChange={(e) => setForm({ ...form, shortDescription: e.target.value })}
-                />
-              </Box>
-
-              <Box sx={{ gridColumn: '1 / -1' }}>
-                <TextField
-                  required
-                  fullWidth
-                  multiline
-                  minRows={2}
-                  label="Detailed Description"
-                  placeholder="Comprehensive details of what is being changed and why..."
-                  value={form.detailedDescription}
-                  onChange={(e) => setForm({ ...form, detailedDescription: e.target.value })}
-                />
-              </Box>
-
-              <Box>
-                <TextField
-                  select
-                  fullWidth
-                  label="Change Type"
-                  value={form.changeType}
-                  onChange={(e) => setForm({ ...form, changeType: e.target.value })}
-                >
-                  <MenuItem value="STANDARD">Standard (Pre-authorized, low risk)</MenuItem>
-                  <MenuItem value="NORMAL">Normal (CAB approval required)</MenuItem>
-                  <MenuItem value="EMERGENCY">Emergency (Urgent fix/downtime prevention)</MenuItem>
-                </TextField>
-              </Box>
-
-              <Box>
-                <TextField
-                  select
-                  fullWidth
-                  label="Category"
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                >
-                  {['SOFTWARE', 'HARDWARE', 'NETWORK', 'DATABASE', 'SECURITY', 'INFRASTRUCTURE', 'APPLICATION', 'OTHER'].map(
-                    (cat) => (
-                      <MenuItem key={cat} value={cat}>
-                        {cat}
-                      </MenuItem>
-                    )
-                  )}
-                </TextField>
-              </Box>
-
-              <Box>
-                <TextField
-                  select
-                  fullWidth
-                  label="Risk Level"
-                  value={form.riskLevel}
-                  onChange={(e) => setForm({ ...form, riskLevel: e.target.value })}
-                >
-                  {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((r) => (
-                    <MenuItem key={r} value={r}>
-                      {r}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Box>
-
-              <Box>
-                <TextField
-                  select
-                  fullWidth
-                  label="Priority"
-                  value={form.priority}
-                  onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                >
-                  {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((p) => (
-                    <MenuItem key={p} value={p}>
-                      {p}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Box>
-
-              <Box>
-                <TextField
-                  fullWidth
-                  label="Affected CI / Asset"
-                  placeholder="e.g. DB-CLUSTER-PROD-01"
-                  value={form.affectedCi}
-                  onChange={(e) => setForm({ ...form, affectedCi: e.target.value })}
-                />
-              </Box>
-
-              <Box>
-                <TextField
-                  fullWidth
-                  label="Department"
-                  value={form.department}
-                  onChange={(e) => setForm({ ...form, department: e.target.value })}
-                />
-              </Box>
-
-              <Box>
-                <TextField
-                  required
-                  fullWidth
-                  label="Requested By"
-                  value={form.requestedBy}
-                  onChange={(e) => setForm({ ...form, requestedBy: e.target.value })}
-                />
-              </Box>
-
-              <Box>
-                <TextField
-                  required
-                  fullWidth
-                  label="Requester Email"
-                  type="email"
-                  value={form.requesterEmail}
-                  onChange={(e) => setForm({ ...form, requesterEmail: e.target.value })}
-                />
-              </Box>
-
-              <Box sx={{ gridColumn: '1 / -1' }}>
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={2}
-                  label="Business Justification"
-                  placeholder="Why is this change necessary for business objectives or regulatory compliance?"
-                  value={form.businessJustification}
-                  onChange={(e) => setForm({ ...form, businessJustification: e.target.value })}
-                />
-              </Box>
-
-              <Box sx={{ gridColumn: '1 / -1' }}>
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={2}
-                  label="Implementation Plan"
-                  placeholder="Step-by-step technical procedures to execute during the window..."
-                  value={form.implementationPlan}
-                  onChange={(e) => setForm({ ...form, implementationPlan: e.target.value })}
-                />
-              </Box>
-
-              <Box>
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={2}
-                  label="Rollback / Backout Plan"
-                  placeholder="How will this change be safely reverted if problems occur?"
-                  value={form.rollbackPlan}
-                  onChange={(e) => setForm({ ...form, rollbackPlan: e.target.value })}
-                />
-              </Box>
-
-              <Box>
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={2}
-                  label="Test Plan"
-                  placeholder="Testing criteria and validation checks following implementation..."
-                  value={form.testPlan}
-                  onChange={(e) => setForm({ ...form, testPlan: e.target.value })}
-                />
-              </Box>
-            </Box>
-          </DialogContent>
-          <DialogActions sx={{ px: 3, py: 2 }}>
-            <Button onClick={() => setCreateModalOpen(false)}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={submitting}>
-              {submitting ? 'Creating...' : 'Submit Change Draft'}
-            </Button>
-          </DialogActions>
-        </Box>
-      </Dialog>
 
       {/* DETAIL & LIFECYCLE DIALOG */}
       <Dialog

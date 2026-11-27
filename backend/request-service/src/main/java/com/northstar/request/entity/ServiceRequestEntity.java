@@ -15,6 +15,16 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
+/**
+ * JPA entity representing a submitted service catalog request stored in {@code service_requests}.
+ *
+ * <p><b>Purpose:</b> Core record for employee catalog requests. Persists unique idempotency keys,
+ * service catalog names, descriptions, requester and beneficiary IDs, assigned approvers, serialized dynamic form fields (JSON),
+ * external sync keys, and status progression.
+ *
+ * <p><b>Downstream / Workflow:</b> Managed by {@link com.northstar.request.repository.ServiceRequestRepository}
+ * and updated by {@link com.northstar.request.service.RequestSubmissionWriter} and {@link com.northstar.request.service.LocalRequestService}.
+ */
 @Entity
 @Table(name = "service_requests")
 public class ServiceRequestEntity {
@@ -63,8 +73,20 @@ public class ServiceRequestEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** Protected no-arg constructor for JPA. */
     protected ServiceRequestEntity() {}
 
+    /**
+     * Constructs a new ServiceRequestEntity with initial status based on approver presence.
+     *
+     * @param idempotencyKey Client idempotency key.
+     * @param serviceName Catalog service name.
+     * @param description Request description.
+     * @param requesterId Requester employee ID.
+     * @param requestedForId Beneficiary employee ID.
+     * @param approverId Optional approver employee ID.
+     * @param fieldsJson Serialized form inputs.
+     */
     public ServiceRequestEntity(String idempotencyKey, String serviceName, String description,
                                 String requesterId, String requestedForId, String approverId, String fieldsJson) {
         this.id = UUID.randomUUID();
@@ -78,12 +100,21 @@ public class ServiceRequestEntity {
         this.status = approverId == null ? RequestStatus.SUBMITTED : RequestStatus.PENDING_APPROVAL;
     }
 
+    /** Pre-persist callback initializing createdAt and updatedAt timestamps. */
     @PrePersist
     void beforeInsert() { this.createdAt = Instant.now(); this.updatedAt = this.createdAt; }
+
+    /** Pre-update callback refreshing the updatedAt timestamp. */
     @PreUpdate
     void beforeUpdate() { this.updatedAt = Instant.now(); }
 
     public UUID getId() { return id; }
+
+    /**
+     * Resolves human-readable request number (ServiceNow RITM number or local NSR-YYYYMMDD-XXXXXXXX format).
+     *
+     * @return Formatted ticket number.
+     */
     public String getRequestNumber() {
         if (serviceNowNumber != null && !serviceNowNumber.isBlank()) {
             return serviceNowNumber;
@@ -100,6 +131,10 @@ public class ServiceRequestEntity {
     public String getFieldsJson() { return fieldsJson; }
     public String getExternalId() { return externalId; }
     public String getExternalSystem() { return externalSystem; }
+    public void setExternalLink(String externalId, String externalSystem) {
+        this.externalId = externalId;
+        this.externalSystem = externalSystem;
+    }
     public RequestStatus getStatus() { return status; }
     public void setStatus(RequestStatus status) { this.status = status; }
     public String getServiceNowNumber() { return serviceNowNumber; }

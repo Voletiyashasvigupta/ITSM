@@ -14,6 +14,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.northstar.request.service.RequestSyncStatusService;
 
+/**
+ * Scheduled background worker implementing reliable transactional outbox message relay to RabbitMQ.
+ *
+ * <p><b>Purpose:</b> Polls unpublished outbox messages, claims them via distributed locking, converts them into persistent
+ * AMQP messages, publishes them to the RabbitMQ exchange with publisher confirms, and applies exponential backoff
+ * retries up to {@code MAX_ATTEMPTS} (4) before routing failures to the dead-letter exchange.
+ *
+ * <p><b>Downstream / Workflow:</b> Periodically triggered by Spring's scheduled task executor every 1000ms.
+ * Notifies {@link RequestSyncStatusService} of delivery or failure.
+ */
 @Component
 public class OutboxRelay {
     private static final Logger log = LoggerFactory.getLogger(OutboxRelay.class);
@@ -23,6 +33,14 @@ public class OutboxRelay {
     private final TransactionTemplate transactions;
     private final RequestSyncStatusService requestStatus;
 
+    /**
+     * Constructs the OutboxRelay worker.
+     *
+     * @param outbox Repository for outbox entities.
+     * @param rabbit RabbitTemplate for AMQP publishing.
+     * @param transactions TransactionTemplate for atomic lock claiming.
+     * @param requestStatus Service tracking sync status on parent requests.
+     */
     public OutboxRelay(OutboxMessageRepository outbox, RabbitTemplate rabbit, TransactionTemplate transactions, RequestSyncStatusService requestStatus) {
         this.outbox = outbox;
         this.rabbit = rabbit;
@@ -30,6 +48,13 @@ public class OutboxRelay {
         this.requestStatus = requestStatus;
     }
 
+    /**
+     * Periodic scheduled poller that claims and publishes pending outbox messages.
+     *
+     * <p><b>Purpose:</b> Executes the outbox delivery pipeline with persistent AMQP delivery modes and publisher confirmations.
+     *
+     * <p><b>Downstream / Workflow:</b> On success marks outbox message delivered; on repeated failure routes to DLQ and updates request status.
+     */
     @Scheduled(fixedDelayString = "${request.outbox.poll-ms:1000}")
     public void relay() {
         Instant now = Instant.now();
@@ -72,6 +97,13 @@ public class OutboxRelay {
         }
     }
 
+    /**
+     * Atomically claims an outbox message for 30 seconds using an isolated transaction.
+     *
+     * @param id Message UUID.
+     * @param now Current timestamp.
+     * @return {@code true} if claimed.
+     */
     private boolean claim(java.util.UUID id, Instant now) {
         return Boolean.TRUE.equals(transactions.execute(status ->
                 outbox.claim(id, now, now.plusSeconds(30)) == 1));
