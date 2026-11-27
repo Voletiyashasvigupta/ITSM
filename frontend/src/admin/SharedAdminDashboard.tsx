@@ -129,6 +129,13 @@ const ScrollTrack = () => (
   />
 )
 
+/**
+ * Shared Administrator & Manager Dashboard Component.
+ * Presents high-level operational KPIs, cross-module queues, and analytics widgets:
+ * - Real-time ticket counts (requests, pending approvals, open incidents, P1 outages, active problems, scheduled changes).
+ * - Incident triage priority breakdown and open request lists.
+ * - Dynamic tab management and customizable widget layouts persisted in browser storage.
+ */
 export default function SharedAdminDashboard({
   requestsCount: _requestsCount,
   pendingApprovalsCount = 0,

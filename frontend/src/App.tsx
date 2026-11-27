@@ -67,14 +67,31 @@ import { useAuth } from './auth/AuthContext'
 import type { PortalUser } from './auth/AuthContext'
 import { useLocation, useNavigate } from 'react-router-dom'
 
+/** Table view item representing an employee service request in the portal. */
 type Request = { id: string; backendId?: string; title: string; category: string; status: string; date: string; createdAt?: string; color: string; description?: string; requesterId?: string; requestedForId?: string; approverId?: string }
+
+/** Pending approval item displayed in the manager/approver queue. */
 type Approval = { id: string; requestId: string; requestNumber: string; title: string; employee: string; initials: string; requested: string; decision?: string }
+
+/** Designated approver option retrieved from GET /api/auth/approvers. */
 type Approver = { id: string; fullName: string }
+
+/** Structured receipt modal data displayed immediately after successful request submission. */
 type RequestReceiptData = { number: string; service: string; status: string; approver: string; createdAt: string; details: Array<{ label: string; value: string }> }
+
+/** Catalog item projected from ServiceNow integration or fallback sample catalog. */
 type LiveCatalogItem = { sys_id?: string; name?: string; short_description?: string; category?: string | { display_value?: string } }
+
+/** Definition of a dynamic input field in a service catalog form. */
 type RequestField = { name: string; label: string; kind: 'select' | 'text' | 'date' | 'textarea'; options?: string[]; required?: boolean; helper?: string }
+
+/** Full details of a service request retrieved from GET /api/requests/{id}. */
 type RequestDetail = { id: string; requestNumber: string; serviceName: string; description: string; requesterId: string; requestedForId: string; approverId: string | null; status: string; externalId?: string | null; externalSystem?: string | null; fields: Record<string,string>; createdAt: string; updatedAt: string }
+
+/** Audit timeline entry retrieved from GET /api/requests/{id}/history. */
 type RequestHistoryRow = { id: string; actorId: string; action: string; fromStatus: string | null; toStatus: string | null; comment?: string | null; createdAt: string }
+
+/** Incident record matching the schema of northstar_incident_service. */
 type IncidentRecord = {
   id: string
   incidentNumber?: string
@@ -98,8 +115,11 @@ type IncidentRecord = {
   createdAt: string
   updatedAt: string
 }
+
+/** Detailed incident record including chronological work notes and comments. */
 type IncidentDetailRecord = { incident: IncidentRecord; comments: Array<{ id: string; authorId: string; comment: string; createdAt: string }> }
 
+/** Knowledge Base self-service article. */
 type KnowledgeArticle = {
   id: string
   title: string
@@ -593,6 +613,14 @@ export default function App() {
     }
   }
 
+  /**
+   * Refreshes all workspace data in parallel across backend microservices:
+   * - GET /api/requests: Employee/Manager request list.
+   * - GET /api/approvals/pending: Approvals awaiting decision.
+   * - GET /api/incidents: IT/Support incidents.
+   * - GET /api/problems: Problem tickets.
+   * - GET /api/changes/dashboard/summary: Change management metrics.
+   */
   const loadWorkspace = async () => {
     setWorkspaceLoading(true); setWorkspaceError('')
     try {
@@ -754,6 +782,13 @@ export default function App() {
   if (authLoading) return <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: 'text.secondary' }}>Checking your sign-in…</Box>
   if (!user) return <AuthScreen />
 
+  /**
+   * Submits a validated service catalog request to the Request Service (POST /api/requests).
+   * - Validates static and conditional required fields.
+   * - Requires selecting an active manager/administrator approver.
+   * - Generates an Idempotency-Key header to prevent duplicate submissions on retry.
+   * - On success, generates a receipt view and updates local request state.
+   */
   async function submitRequest(service: string) {
     const definition = serviceForms[service] ?? { intro: '', fields: [
       { name: 'requestType', label: 'What do you need?', kind: 'text' as const, required: true },
@@ -803,6 +838,10 @@ export default function App() {
     window.setTimeout(() => setToast(''), 5000)
   }
 
+  /**
+   * Decides an approval request via POST /api/approvals/{id}/approve or /reject.
+   * Enforces a mandatory explanation comment if the action is a rejection.
+   */
   async function decideApproval(id: string, approve: boolean) {
     const comment = approve ? '' : window.prompt('Add a reason for rejecting this request:')?.trim()
     if (!approve && !comment) return
@@ -815,6 +854,10 @@ export default function App() {
     window.setTimeout(() => setToast(''), 5000)
   }
 
+  /**
+   * Opens the dynamic service request form for a selected catalog item.
+   * Retrieves the next available request ticket number from GET /api/requests/next-number.
+   */
   async function openServiceForm(serviceTitle: string) {
     let nextNum = 'REQ' + String(10001 + requests.length).padStart(7, '0')
     try {
@@ -828,6 +871,11 @@ export default function App() {
     setSelectedService(serviceTitle)
   }
 
+  /**
+   * Initializes and opens the incident reporting form modal.
+   * Pre-fetches the next incident ticket number (GET /api/incidents/next-number)
+   * and calculates initial priority based on the ITIL impact/urgency matrix.
+   */
   async function openNewIncidentForm() {
     setIncidentFormOpen(true)
     setIncidentSearchQuery('')
@@ -853,6 +901,12 @@ export default function App() {
     })
   }
 
+  /**
+   * Submits a new incident report to the Incident Service (POST /api/incidents).
+   * Bundles attached file metadata and internal work notes into the description.
+   * 
+   * @param stayOnForm If true, keeps the user on the detail view after creation.
+   */
   async function createIncident(stayOnForm = false) {
     if (!incidentForm.shortDescription.trim()) {
       setToast('Short description is required before submitting.')
@@ -1070,6 +1124,10 @@ export default function App() {
     ]
   }
 
+  /**
+   * Retrieves full details and audit history for a request (GET /api/requests/{id} & /history),
+   * sets the active view to 'Request Detail', and updates the browser route.
+   */
   async function openRequest(request: Request) {
     if (!request.backendId) return
     try {
@@ -1081,6 +1139,10 @@ export default function App() {
     } catch (cause) { setToast(cause instanceof Error ? cause.message : 'Request details could not be loaded.'); window.setTimeout(() => setToast(''),5000) }
   }
 
+  /**
+   * Retrieves incident details and comments from GET /api/incidents/{id},
+   * transitions view to 'Incident Detail', and updates the browser route.
+   */
   async function openIncident(id: string) {
     try {
       const response = await apiFetch(`/api/incidents/${id}`)
@@ -1089,6 +1151,9 @@ export default function App() {
     } catch (cause) { setToast(cause instanceof Error ? cause.message : 'Incident details could not be loaded.'); window.setTimeout(() => setToast(''),5000) }
   }
 
+  /**
+   * Adds an internal comment or public work note to the active incident (POST /api/incidents/{id}/comments).
+   */
   async function addIncidentComment() {
     if (!incidentDetail || !incidentComment.trim()) return
     const response = await apiFetch(`/api/incidents/${incidentDetail.incident.id}/comments`,{method:'POST',body:JSON.stringify({comment:incidentComment})})
@@ -1096,6 +1161,9 @@ export default function App() {
     setIncidentComment(''); await openIncident(incidentDetail.incident.id)
   }
 
+  /**
+   * Updates an incident's lifecycle status (PATCH /api/incidents/{id}/status) (Manager/Admin only).
+   */
   async function updateIncidentStatus(status: string) {
     if (!incidentDetail) return
     const response = await apiFetch(`/api/incidents/${incidentDetail.incident.id}/status`,{method:'PATCH',body:JSON.stringify({status})})
@@ -3267,11 +3335,23 @@ function RequestDetailReport({
   )
 }
 
+/**
+ * Approval Queue List Component.
+ * Displays a list of pending requests assigned to the current manager,
+ * with quick one-click 'Approve' and 'Reject' actions.
+ */
 export function ApprovalQueue({ approvals, onApprove, onReject }: { approvals: Approval[]; onApprove: (id: string) => void; onReject: (id: string) => void }) {
   if (approvals.length === 0) return <Typography color="text.secondary" sx={{ py: 3 }}>There are no requests awaiting your approval.</Typography>
   return <Box className="approval-list">{approvals.map((approval) => <Box className="approval-item" key={approval.id}><Avatar className="approval-avatar">{approval.initials}</Avatar><Box className="approval-copy"><Typography className="approval-title">{approval.title}</Typography><Typography className="approval-detail">{approval.requestNumber} · Requested by {approval.employee} · {approval.requested}</Typography></Box><Button size="small" color="success" onClick={() => onApprove(approval.id)}>Approve</Button><Button size="small" color="error" onClick={() => onReject(approval.id)}>Reject</Button></Box>)}</Box>
 }
 
+/**
+ * Dynamic Service Catalog Request Form Component.
+ * - Dynamically renders form input fields based on the selected catalog service name.
+ * - Fetches next request number preview from GET /api/requests/next-number.
+ * - Dynamically injects conditional fields (e.g. access targets, device specifications).
+ * - Enforces required field validation before enabling the 'Submit' button.
+ */
 export function ServiceRequestForm({ service, values, setValues, approvers, approversLoading, busy, onCancel, onSubmit }: { service: string; values: Record<string, string>; setValues: (values: Record<string, string>) => void; approvers: Approver[]; approversLoading: boolean; busy: boolean; onCancel: () => void; onSubmit: () => void }) {
   const { apiFetch } = useAuth()
   const [copied, setCopied] = useState(false)

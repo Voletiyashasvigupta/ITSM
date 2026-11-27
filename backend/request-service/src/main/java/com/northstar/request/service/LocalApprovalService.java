@@ -5,10 +5,13 @@ import com.northstar.request.entity.RequestHistoryEntity;
 import com.northstar.request.entity.RequestStatus;
 import com.northstar.request.entity.ServiceRequestEntity;
 import com.northstar.request.dto.ApprovalResponse;
+import com.northstar.request.integration.ServiceNowRequestClient;
 import com.northstar.request.repository.ApprovalRepository;
 import com.northstar.request.repository.RequestHistoryRepository;
 import com.northstar.request.repository.ServiceRequestRepository;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -80,12 +83,14 @@ class LocalApprovalServiceImpl implements LocalApprovalService {
     private final ServiceRequestRepository requests;
     private final RequestHistoryRepository history;
     private final RequestStateMachine stateMachine;
+    private final ServiceNowRequestClient serviceNowClient;
 
-    LocalApprovalServiceImpl(ApprovalRepository a, ServiceRequestRepository r, RequestHistoryRepository h, RequestStateMachine stateMachine) {
+    LocalApprovalServiceImpl(ApprovalRepository a, ServiceRequestRepository r, RequestHistoryRepository h, RequestStateMachine stateMachine, ServiceNowRequestClient serviceNowClient) {
         this.approvals = a;
         this.requests = r;
         this.history = h;
         this.stateMachine = stateMachine;
+        this.serviceNowClient = serviceNowClient;
     }
 
     @Override
@@ -128,6 +133,15 @@ class LocalApprovalServiceImpl implements LocalApprovalService {
         a.decide(approve ? "APPROVED" : "REJECTED", comment == null ? null : comment.trim());
         r.setStatus(target);
         history.save(new RequestHistoryEntity(r.getId(), actor, approve ? "APPROVED" : "REJECTED", from.name(), target.name(), comment));
+
+        if (r.getExternalId() != null && !r.getExternalId().isBlank()) {
+            Map<String, Object> snUpdate = new HashMap<>();
+            snUpdate.put("approval", approve ? "approved" : "rejected");
+            snUpdate.put("state", approve ? "2" : "4");
+            snUpdate.put("work_notes", (approve ? "Approved" : "Rejected") + " by " + actor + " in Service Hub" + (comment != null && !comment.isBlank() ? ": " + comment.trim() : ""));
+            serviceNowClient.updateRequest(r.getExternalId(), snUpdate);
+        }
+
         return view(a);
     }
 

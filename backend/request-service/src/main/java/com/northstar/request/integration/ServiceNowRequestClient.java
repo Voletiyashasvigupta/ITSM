@@ -51,4 +51,25 @@ public class ServiceNowRequestClient {
             return null;
         }
     }
+
+    /**
+     * Updates an existing request in ServiceNow.
+     *
+     * @param sysId ServiceNow record sys_id.
+     * @param payload Map of updated attributes (e.g. approval, state, work_notes).
+     * @return Map of updated fields or null if failed.
+     */
+    public Map<String, Object> updateRequest(String sysId, Map<String, Object> payload) {
+        try {
+            return restClient.patch()
+                    .uri("/requests/" + sysId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(payload)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+        } catch (Exception ex) {
+            log.warn("ServiceNow request update failed for {}: {}", sysId, ex.getMessage());
+            return null;
+        }
+    }
 }

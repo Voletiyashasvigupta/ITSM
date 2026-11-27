@@ -88,6 +88,16 @@ function getStatusColor(status?: string) {
   return { bg: '#f8fafc', text: '#334155', border: '#e2e8f0' }
 }
 
+/**
+ * Problem Management Component.
+ * Supports root cause investigation and lifecycle tracking for systemic recurring issues:
+ * - Problem Creation: Submitting new problem tickets (POST /api/problems).
+ * - Management & Assignments: Assigning problem analysts and support engineers (PUT /api/problems/{id}/management).
+ * - Root Cause Analysis (RCA): Documenting investigation notes, root causes, and workarounds (PUT /api/problems/{id}/investigation).
+ * - Technical Work & Resolution: Persisting technical notes and fixes (PUT /api/problems/{id}/technical-work).
+ * - Lifecycle Status Progression: Transitioning states through OPEN, ASSIGNED, INVESTIGATION, ROOT_CAUSE_IDENTIFIED, SOLUTION_IN_PROGRESS, RESOLVED, CLOSED.
+ * - Deletion: Admin deletion of duplicate/invalid problem tickets (DELETE /api/problems/{id}).
+ */
 export default function ProblemManagement({
   problems,
   loading,

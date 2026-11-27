@@ -220,6 +220,16 @@ const STATUS_FILTERS = [
   'CANCELLED',
 ]
 
+/**
+ * Change Management Component.
+ * Implements end-to-end ITIL Request for Change (RFC) lifecycle workflows:
+ * 1. Change Ingestion: Creating change drafts (POST /api/changes).
+ * 2. Assessment: Risk scoring, technical/analyst assignments (POST /api/changes/{id}/assess).
+ * 3. Review & CAB: Change Advisory Board evaluation and decision (POST /api/changes/{id}/approve or /reject).
+ * 4. Scheduling & Execution: Maintenance windows, implementation start/completion (POST /api/changes/{id}/start-implementation).
+ * 5. Validation & Rollback: Recording QA test results, automated rollback triggers (POST /api/changes/{id}/rollback).
+ * 6. Closure: Post-Implementation Review (PIR) and closure (POST /api/changes/{id}/close).
+ */
 export default function ChangeManagement({
   isManagerAdmin,
   currentUserEmail,

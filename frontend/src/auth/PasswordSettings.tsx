@@ -34,11 +34,26 @@ import {
 } from '@mui/icons-material'
 import { useAuth } from './AuthContext'
 
+/**
+ * Props passed to the PasswordSettings component.
+ */
 export type SettingsProps = {
+  /** Callback to navigate to another portal page or view. */
   onNavigate?: (page: string) => void
+  /** Callback to trigger a floating toast notification. */
   setToast?: (msg: string) => void
 }
 
+/**
+ * Settings and Profile Management Component.
+ * Provides user configuration and security controls across 6 tabs:
+ * 1. Profile: Displays current user identity, assigned role, department, and account status.
+ * 2. Preferences: Configures landing page, density, and local time formatting (persisted in localStorage).
+ * 3. Notifications: Manages email and in-app notification rules (persisted in localStorage).
+ * 4. Security & Password: Form to update account password via POST /api/auth/me/password.
+ * 5. ITSM Policies (Manager/Admin): Service ticket numbering and SLA thresholds.
+ * 6. Audit & System: Client-side audit log JSON export and dashboard layout reset.
+ */
 export default function PasswordSettings({ onNavigate, setToast }: SettingsProps) {
   const { user, apiFetch, isImpersonating } = useAuth()
   const isManagerAdmin = user?.role === 'MANAGER_ADMIN'

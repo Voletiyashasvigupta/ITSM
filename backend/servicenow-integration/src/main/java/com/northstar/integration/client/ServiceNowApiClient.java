@@ -121,6 +121,32 @@ public class ServiceNowApiClient {
     }
 
     /**
+     * Updates an existing record in ServiceNow via Table API PATCH.
+     */
+    public Map<String, Object> updateRecord(String table, String sysId, Map<String, Object> payload) {
+        requireConfiguration();
+        return circuitBreakers.create("serviceNow").run(
+                () -> {
+                    String authHeader = buildAuthorizationHeader();
+                    Map<String, Object> body = restClient.patch()
+                            .uri(properties.baseUrl() + "/api/now/table/" + table + "/" + sysId)
+                            .headers(headers -> headers.set("Authorization", authHeader))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(payload)
+                            .retrieve()
+                            .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+                    if (body == null || !(body.get("result") instanceof Map<?, ?> result)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "ServiceNow " + table + " update returned invalid payload");
+                    }
+                    return (Map<String, Object>) result;
+                },
+                failure -> {
+                    log.error("ServiceNow {} update failed for {}: {}", table, sysId, failure.getMessage(), failure);
+                    throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "ServiceNow " + table + " update failed");
+                });
+    }
+
+    /**
      * Submits a new incident to the ServiceNow Table API.
      */
     public Map<String, Object> createIncident(Map<String, Object> payload) {

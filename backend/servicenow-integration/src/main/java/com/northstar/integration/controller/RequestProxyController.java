@@ -2,6 +2,8 @@ package com.northstar.integration.controller;
 
 import com.northstar.integration.client.ServiceNowApiClient;
 import java.util.Map;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,5 +27,10 @@ public class RequestProxyController {
     @PostMapping
     public Map<String, Object> createRequest(@RequestBody Map<String, Object> payload) {
         return client.createRequest(payload);
+    }
+
+    @PatchMapping("/{sysId}")
+    public Map<String, Object> updateRequest(@PathVariable String sysId, @RequestBody Map<String, Object> payload) {
+        return client.updateRecord("sc_req_item", sysId, payload);
     }
 }
