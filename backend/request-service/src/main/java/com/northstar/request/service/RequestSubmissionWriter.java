@@ -74,26 +74,93 @@ public class RequestSubmissionWriter {
         catch (JsonProcessingException exception) { throw new IllegalArgumentException("Request fields are invalid", exception); }
         ServiceRequestEntity entity = new ServiceRequestEntity(
                 idempotencyKey, input.serviceName().trim(), input.description().trim(), requesterId, input.requestedForId().trim(), input.approverId().trim(), fieldsJson);
-        String customNum = input.fields() != null ? input.fields().get("requestNumber") : null;
-        if (customNum == null && input.fields() != null) customNum = input.fields().get("number");
-        if (customNum != null && !customNum.isBlank()) {
-            entity.setServiceNowNumber(customNum.trim());
+        Map<String, String> storedFields = new HashMap<>(input.fields() == null ? Map.of() : input.fields());
+        if (storedFields.get("orgGroup") != null) {
+            entity.setOrgGroup(storedFields.get("orgGroup"));
         }
 
         // Attempt live synchronization with external ServiceNow Cloud instance
+        // Submits full catalog request workflow: parent sc_request (REQ) and sc_req_item (RITM)
+        boolean outage = false;
+        String outageMessage = null;
         try {
             Map<String, Object> snPayload = new HashMap<>();
             snPayload.put("short_description", input.serviceName().trim());
-            snPayload.put("description", input.description().trim());
-            snPayload.put("special_instructions", "Requested for: " + input.requestedForId().trim() + ", Approver: " + input.approverId().trim());
+            snPayload.put("correlation_id", idempotencyKey);
+            snPayload.put("variables", new HashMap<>(storedFields));
+
+            StringBuilder descBuilder = new StringBuilder();
+            descBuilder.append("Catalog Item: ").append(input.serviceName().trim()).append("\n");
+            descBuilder.append("Requester: ").append(requesterId).append("\n");
+            descBuilder.append("Requested For: ").append(input.requestedForId().trim()).append("\n");
+            descBuilder.append("Approver: ").append(input.approverId().trim()).append("\n\n");
+            descBuilder.append("Submitted Answers:\n");
+            storedFields.forEach((k, v) -> {
+                if (!"requestNumber".equals(k) && !"number".equals(k)) {
+                    descBuilder.append(" - ").append(k).append(": ").append(v).append("\n");
+                }
+            });
+            snPayload.put("description", descBuilder.toString().trim());
+
+            StringBuilder special = new StringBuilder();
+            special.append("Requested for: ").append(input.requestedForId().trim()).append(", Approver: ").append(input.approverId().trim()).append(". Answers: ");
+            storedFields.forEach((k, v) -> {
+                if (!"requestNumber".equals(k) && !"number".equals(k)) {
+                    special.append(k).append("=").append(v).append("; ");
+                }
+            });
+            snPayload.put("special_instructions", special.toString().trim());
+            snPayload.put("requested_for", input.requestedForId().trim());
+
+            String catItemId = storedFields.get("cat_item");
+            if (catItemId == null || catItemId.isBlank()) catItemId = storedFields.get("catalogItemId");
+            if (catItemId == null || catItemId.isBlank()) catItemId = storedFields.get("sys_id");
+            if (catItemId != null && !catItemId.isBlank() && catItemId.length() == 32) {
+                snPayload.put("cat_item", catItemId.trim());
+            }
+
+            int qty = 1;
+            if (storedFields.containsKey("quantity")) {
+                try { qty = Integer.parseInt(storedFields.get("quantity").replace("+", "").trim()); } catch (Exception ignored) {}
+            }
+            snPayload.put("quantity", qty);
 
             Map<String, Object> snResponse = serviceNowClient.createRequest(snPayload);
-            if (snResponse != null && snResponse.get("number") != null) {
-                entity.setServiceNowNumber(String.valueOf(snResponse.get("number")));
-                entity.setExternalLink(String.valueOf(snResponse.get("sys_id")), "servicenow");
+            if (snResponse != null) {
+                String reqNum = snResponse.get("request_number") != null ? String.valueOf(snResponse.get("request_number")) : null;
+                String ritmNum = snResponse.get("ritm_number") != null ? String.valueOf(snResponse.get("ritm_number")) : null;
+                String primaryNum = reqNum != null ? reqNum : (snResponse.get("number") != null ? String.valueOf(snResponse.get("number")) : ritmNum);
+                String primarySysId = snResponse.get("sys_id") != null ? String.valueOf(snResponse.get("sys_id")) : String.valueOf(snResponse.get("ritm_sys_id"));
+
+                if (primaryNum != null && !primaryNum.isBlank()) {
+                    entity.setServiceNowNumber(primaryNum);
+                    storedFields.put("serviceNowNumber", primaryNum);
+                }
+                if (reqNum != null) storedFields.put("serviceNowReqNumber", reqNum);
+                if (ritmNum != null) storedFields.put("serviceNowRitmNumber", ritmNum);
+                if (snResponse.get("request_sys_id") != null) storedFields.put("serviceNowReqSysId", String.valueOf(snResponse.get("request_sys_id")));
+                if (snResponse.get("ritm_sys_id") != null) storedFields.put("serviceNowRitmSysId", String.valueOf(snResponse.get("ritm_sys_id")));
+
+                if (primarySysId != null && !primarySysId.isBlank() && !"null".equals(primarySysId)) {
+                    entity.setExternalLink(primarySysId, "servicenow");
+                }
+                storedFields.put("syncStatus", "SYNCED");
+                storedFields.remove("syncError");
+                try {
+                    entity.setFieldsJson(mapper.writeValueAsString(storedFields));
+                } catch (Exception ignored) {}
             }
-        } catch (Exception ignored) {
-            // Graceful fallback to local numbering
+        } catch (Exception ex) {
+            // Outage handling: save local record as pending, queue for retry, and record in audit history
+            outage = true;
+            outageMessage = ex.getMessage() != null ? ex.getMessage() : ex.toString();
+            storedFields.put("syncStatus", "PENDING_RETRY");
+            storedFields.put("syncError", "ServiceNow unreachable: " + outageMessage);
+            storedFields.put("syncAttempts", "1");
+            storedFields.put("nextSyncAttemptAt", Instant.now().plusSeconds(10).toString());
+            try {
+                entity.setFieldsJson(mapper.writeValueAsString(storedFields));
+            } catch (Exception ignored) {}
         }
 
         entity = requests.saveAndFlush(entity);
@@ -101,6 +168,10 @@ public class RequestSubmissionWriter {
             approvals.save(new ApprovalEntity(entity.getId(), entity.getApproverId()));
         }
         history.save(new RequestHistoryEntity(entity.getId(), requesterId, "SUBMITTED", null, entity.getStatus().name(), null));
+        if (outage) {
+            history.save(new RequestHistoryEntity(entity.getId(), "system", "SERVICENOW_OUTAGE", null, entity.getStatus().name(),
+                    "ServiceNow unreachable during submission (" + outageMessage + "). Record preserved locally and queued for background retry."));
+        }
         try {
             var event = new RequestQueuedEvent(entity.getId(), entity.getRequestNumber(), entity.getIdempotencyKey(), entity.getServiceName(),
                     entity.getDescription(), entity.getRequesterId(), entity.getRequestedForId(), entity.getApproverId(),

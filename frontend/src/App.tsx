@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AppBar, Avatar, Badge, Box, Button, ButtonBase, Chip, Divider, FormControl, IconButton, InputAdornment, InputLabel, Alert, CircularProgress,
-  Dialog, DialogActions, DialogContent, DialogTitle, List, ListItemButton, ListItemIcon, ListItemText, Menu, MenuItem, Paper, Select,
-  TextField, Toolbar, Typography,
+  Avatar, Badge, Box, Button, ButtonBase, Chip, Divider, FormControl, IconButton, InputLabel, Alert, CircularProgress,
+  Dialog, DialogActions, DialogContent, DialogTitle, List, ListItemIcon, ListItemText, Menu, MenuItem, Paper, Select,
+  TextField, Typography,
 } from '@mui/material'
 import DashboardRounded from '@mui/icons-material/DashboardRounded'
 import SearchRounded from '@mui/icons-material/SearchRounded'
-import NotificationsNoneRounded from '@mui/icons-material/NotificationsNoneRounded'
 import ControlPointRounded from '@mui/icons-material/ControlPointRounded'
 import LaptopMacRounded from '@mui/icons-material/LaptopMacRounded'
 import ManageAccountsRounded from '@mui/icons-material/ManageAccountsRounded'
@@ -17,7 +16,6 @@ import TaskAltRounded from '@mui/icons-material/TaskAltRounded'
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined'
 import KeyboardArrowRightRounded from '@mui/icons-material/KeyboardArrowRightRounded'
 import SupportAgentRounded from '@mui/icons-material/SupportAgentRounded'
-import LogoutRounded from '@mui/icons-material/LogoutRounded'
 import AttachFileRounded from '@mui/icons-material/AttachFileRounded'
 import TuneRounded from '@mui/icons-material/TuneRounded'
 import MoreHorizRounded from '@mui/icons-material/MoreHorizRounded'
@@ -48,6 +46,8 @@ import PlayArrowRounded from '@mui/icons-material/PlayArrowRounded'
 import FirstPageRounded from '@mui/icons-material/FirstPageRounded'
 import LastPageRounded from '@mui/icons-material/LastPageRounded'
 import KeyboardArrowLeftRounded from '@mui/icons-material/KeyboardArrowLeftRounded'
+import SyncRounded from '@mui/icons-material/SyncRounded'
+import ShoppingCartRounded from '@mui/icons-material/ShoppingCartRounded'
 import TimelineRounded from '@mui/icons-material/TimelineRounded'
 import CheckRounded from '@mui/icons-material/CheckRounded'
 import CheckCircleOutlineRounded from '@mui/icons-material/CheckCircleOutlineRounded'
@@ -60,12 +60,11 @@ import AuthScreen from './auth/AuthScreen'
 import PasswordSettings from './auth/PasswordSettings'
 import UserAccessPage from './auth/UserAccessPage'
 import ProblemManagement, { type ProblemRecord } from './problems/ProblemManagement'
-import ReportProblemRounded from '@mui/icons-material/ReportProblemRounded'
 import ChangeManagement from './changes/ChangeManagement'
-import PublishedWithChangesRounded from '@mui/icons-material/PublishedWithChangesRounded'
 import { useAuth } from './auth/AuthContext'
 import type { PortalUser } from './auth/AuthContext'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { LiventoAppShell } from './livento/LiventoAppShell'
 
 /** Table view item representing an employee service request in the portal. */
 type Request = { id: string; backendId?: string; title: string; category: string; status: string; date: string; createdAt?: string; color: string; description?: string; requesterId?: string; requestedForId?: string; approverId?: string }
@@ -83,7 +82,19 @@ type RequestReceiptData = { number: string; service: string; status: string; app
 type LiveCatalogItem = { sys_id?: string; name?: string; short_description?: string; category?: string | { display_value?: string } }
 
 /** Definition of a dynamic input field in a service catalog form. */
-type RequestField = { name: string; label: string; kind: 'select' | 'text' | 'date' | 'textarea'; options?: string[]; required?: boolean; helper?: string }
+type RequestField = {
+  name: string
+  label: string
+  kind: 'select' | 'text' | 'date' | 'textarea' | 'multi-select' | 'checkbox' | 'number' | 'reference'
+  options?: string[]
+  required?: boolean
+  helper?: string
+  condition?: {
+    dependsOn: string
+    value: string
+    action: string
+  }
+}
 
 /** Full details of a service request retrieved from GET /api/requests/{id}. */
 type RequestDetail = { id: string; requestNumber: string; serviceName: string; description: string; requesterId: string; requestedForId: string; approverId: string | null; status: string; externalId?: string | null; externalSystem?: string | null; fields: Record<string,string>; createdAt: string; updatedAt: string }
@@ -106,12 +117,17 @@ type IncidentRecord = {
   urgency?: string
   priority: string
   assignedTo?: string
+  assignmentGroup?: string | null
+  syncStatus?: string | null
+  syncError?: string | null
   shortDescription?: string
   description: string
   title: string
   status: string
   reporterId: string
   assigneeId?: string | null
+  externalId?: string | null
+  externalSystem?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -232,12 +248,28 @@ function computeIncidentPriority(impact: string, urgency: string): string {
 const initialRequests: Request[] = []
 const initialApprovals: Approval[] = []
 const services = [
+  { title: 'Asset purchase', description: 'Procure hardware assets, equipment, laptops and monitors through ServiceNow', icon: <ShoppingCartRounded />, tint: 'tint-blue', group: 'Asset Procurement' },
   { title: 'Request a device', description: 'Laptops, monitors and accessories', icon: <LaptopMacRounded />, tint: 'tint-blue', group: 'IT' },
   { title: 'Access and accounts', description: 'Software, shared drives and access', icon: <ManageAccountsRounded />, tint: 'tint-violet', group: 'IT' },
   { title: 'Workplace services', description: 'Facilities, parking and office needs', icon: <LocalParkingRounded />, tint: 'tint-orange', group: 'Facilities' },
   { title: 'People support', description: 'Benefits, onboarding and HR help', icon: <MedicalServicesRounded />, tint: 'tint-green', group: 'HR' },
 ]
 const serviceForms: Record<string, { intro: string; fields: RequestField[] }> = {
+  'Asset purchase': { intro: 'Procure hardware assets, computer equipment, peripherals, and workstations through ServiceNow with budget and manager approval.', fields: [
+    { name: 'assetType', label: 'Asset type', kind: 'select', options: ['Laptop / Workstation', 'Monitor / Display', 'Server & Storage', 'Networking Equipment', 'Mobile & Tablet', 'Peripherals & Accessories', 'Specialized Hardware'], required: true, helper: 'Select asset classification' },
+    { name: 'assetModel', label: 'Asset model and specifications', kind: 'text', required: true, helper: 'Specify model & specs (e.g. MacBook Pro 16" M3 Max / 64GB RAM)' },
+    { name: 'quantity', label: 'Quantity needed', kind: 'number', required: true, helper: 'Quantity of units required' },
+    { name: 'estimatedBudget', label: 'Estimated budget ($ USD)', kind: 'number', required: true, helper: 'Estimated purchase cost in USD' },
+    { name: 'costCenter', label: 'Department / Cost center', kind: 'text', required: true, helper: 'Billing cost center (e.g. Engineering - CC-402)' },
+    { name: 'deliveryLocation', label: 'Delivery location', kind: 'text', required: true, helper: 'Office facility or shipping address' },
+    { name: 'deliveryContact', label: 'Delivery contact person', kind: 'text', required: true, helper: 'Recipient contact name & phone/email' },
+    { name: 'neededBy', label: 'Target delivery date', kind: 'date', required: true },
+    { name: 'reason', label: 'Business justification', kind: 'textarea', required: true, helper: 'State why this asset is required and its intended usage.' },
+    { name: 'isExpedited', label: 'Expedited shipping', kind: 'checkbox', required: false, helper: 'Request expedited procurement priority' },
+    { name: 'expeditedJustification', label: 'Expedited shipping justification', kind: 'textarea', required: true, helper: 'Explain why standard delivery time cannot be accommodated', condition: { dependsOn: 'isExpedited', value: 'true', action: 'show' } },
+    { name: 'accessories', label: 'Included accessories', kind: 'multi-select', options: ['Docking Station', 'Dual Monitors', 'Wireless Keyboard & Mouse', 'Laptop Stand', 'Carrying Sleeve', 'Extra Power Supply'], required: false },
+    { name: 'referenceAsset', label: 'Replaced asset reference / tag', kind: 'reference', required: false, helper: 'Existing asset tag or serial number being replaced' },
+  ] },
   'Request a device': { intro: 'Select equipment needed. Required fields only.', fields: [
     { name: 'item', label: 'What do you need?', kind: 'select', options: ['Laptop', 'Desktop computer', 'Monitor', 'Docking station', 'Keyboard or mouse', 'Headset or webcam', 'Mobile phone', 'Other'], required: true },
     { name: 'neededBy', label: 'When do you need it?', kind: 'date', required: true },
@@ -282,9 +314,6 @@ const managementNav = [
   { label: 'Approvals', icon: <TaskAltRounded /> },
   { label: 'User access', icon: <ManageAccountsRounded /> },
 ]
-const incidentNav = { label: 'Incidents', icon: <SupportAgentRounded /> }
-const problemNav = { label: 'Problems', icon: <ReportProblemRounded /> }
-const changeNav = { label: 'Changes', icon: <PublishedWithChangesRounded /> }
 
 function statusTone(status: Request['status']) { return status === 'Completed' ? 'success' : status === 'Awaiting approval' || status === 'Pending sync' ? 'warning' : 'info' }
 
@@ -334,6 +363,7 @@ export default function App() {
   const [catalogStale, setCatalogStale] = useState(false)
   const [catalogFilter, setCatalogFilter] = useState('All teams')
   const [selectedService, setSelectedService] = useState<string | null>(null)
+  const [dynamicFormDef, setDynamicFormDef] = useState<{ intro: string; fields: RequestField[] } | null>(null)
   const [requestFields, setRequestFields] = useState<Record<string, string>>({})
   const [approvers, setApprovers] = useState<Approver[]>([])
   const [approversLoading, setApproversLoading] = useState(false)
@@ -687,17 +717,20 @@ export default function App() {
 
   const filteredServices = useMemo(() => services.filter((s) => `${s.title} ${s.description} ${s.group}`.toLowerCase().includes(query.toLowerCase())), [query])
   const displayedCatalog = useMemo(() => {
-    const catalogItems = !liveCatalog.length ? filteredServices : liveCatalog.map((item, index) => {
-      const fallback = services[index % services.length]
-      const category = typeof item.category === 'string' ? item.category : item.category?.display_value
-      return {
-        title: item.name || 'Service request',
-        description: item.short_description || 'View details and submit this service request.',
-        icon: fallback.icon,
-        tint: fallback.tint,
-        group: category || fallback.group,
-      }
-    })
+    const catalogItems = !liveCatalog.length
+      ? filteredServices.map((s) => ({ ...s, id: s.title.toLowerCase().replace(/\s+/g, '-') }))
+      : liveCatalog.map((item, index) => {
+          const fallback = services[index % services.length]
+          const category = typeof item.category === 'string' ? item.category : item.category?.display_value
+          return {
+            id: item.sys_id,
+            title: item.name || 'Service request',
+            description: item.short_description || 'View details and submit this service request.',
+            icon: fallback.icon,
+            tint: fallback.tint,
+            group: item.name?.toLowerCase().includes('asset') ? 'Asset Procurement' : (category || fallback.group),
+          }
+        })
     return catalogItems.filter((item) => {
       const matchesSearch = `${item.title} ${item.description} ${item.group}`.toLowerCase().includes(query.toLowerCase())
       const matchesTeam = catalogFilter === 'All teams' || item.group.toLowerCase().includes(catalogFilter.toLowerCase())
@@ -739,7 +772,6 @@ export default function App() {
     return [...kbResults, ...catResults]
   }, [effectiveIncidentQuery, incidentSearchFilter, displayedCatalog])
   const firstName = user?.fullName.split(/\s+/)[0] ?? 'there'
-  const initials = user?.fullName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() ?? 'N'
   const title = selectedService ? selectedService : active === 'Overview' ? `Good morning, ${firstName}` : active
   const todayLabel = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase()
 
@@ -790,7 +822,7 @@ export default function App() {
    * - On success, generates a receipt view and updates local request state.
    */
   async function submitRequest(service: string) {
-    const definition = serviceForms[service] ?? { intro: '', fields: [
+    const definition = dynamicFormDef ?? serviceForms[service] ?? { intro: '', fields: [
       { name: 'requestType', label: 'What do you need?', kind: 'text' as const, required: true },
       { name: 'neededBy', label: 'When do you need it?', kind: 'date' as const },
       { name: 'reason', label: 'Business reason and details', kind: 'textarea' as const, required: true },
@@ -802,7 +834,7 @@ export default function App() {
       window.setTimeout(() => setToast(''), 5000)
       return
     }
-    const conditional = conditionalRequestFields(service, requestFields)
+    const conditional = dynamicFormDef ? [] : conditionalRequestFields(service, requestFields)
     if ([...definition.fields, ...conditional].some((field) => field.required && !requestFields[field.name]?.trim())) {
       setToast('Complete all required fields before submitting.'); window.setTimeout(() => setToast(''), 5000); return
     }
@@ -829,6 +861,7 @@ export default function App() {
       setRequests((current) => [{ id: requestNumber, backendId: result.id, title: service, category: 'New request', status, date, color: 'amber', description: details.replace(/\n/g, ' · '), requesterId: user?.id, requestedForId: user?.id, approverId: requestFields.approverId }, ...current])
       setReceipt({ number: requestNumber, service, status, approver: approverName, createdAt: dateValue.toLocaleString(), details: [...detailItems, { label: 'Approver', value: approverName }] })
       setSelectedService(null)
+      setDynamicFormDef(null)
       setRequestFields({})
       setActive('Request receipt')
       void loadWorkspace()
@@ -856,9 +889,10 @@ export default function App() {
 
   /**
    * Opens the dynamic service request form for a selected catalog item.
-   * Retrieves the next available request ticket number from GET /api/requests/next-number.
+   * Retrieves the next available request ticket number from GET /api/requests/next-number
+   * and loads item-specific variable fields from the catalog service.
    */
-  async function openServiceForm(serviceTitle: string) {
+  async function openServiceForm(serviceTitle: string, itemSysId?: string) {
     let nextNum = 'REQ' + String(10001 + requests.length).padStart(7, '0')
     try {
       const res = await apiFetch('/api/requests/next-number')
@@ -867,8 +901,25 @@ export default function App() {
         if (data.number) nextNum = data.number
       }
     } catch {}
-    setRequestFields({ requestNumber: nextNum })
+    setRequestFields({ requestNumber: nextNum, ...(itemSysId ? { catalogItemSysId: itemSysId } : {}) })
     setSelectedService(serviceTitle)
+    setDynamicFormDef(null)
+
+    const target = itemSysId || serviceTitle
+    try {
+      const formRes = await apiFetch(`/api/catalog/items/${encodeURIComponent(target)}/form-definition`)
+      if (formRes.ok) {
+        const formData = await formRes.json() as { intro?: string; fields?: RequestField[] }
+        if (formData.fields && formData.fields.length > 0) {
+          setDynamicFormDef({
+            intro: formData.intro || '',
+            fields: formData.fields,
+          })
+        }
+      }
+    } catch (err) {
+      console.warn('Could not load dynamic form schema, falling back to static schema:', err)
+    }
   }
 
   /**
@@ -1131,6 +1182,13 @@ export default function App() {
   async function openRequest(request: Request) {
     if (!request.backendId) return
     try {
+      void apiFetch(`/api/requests/${request.backendId}/sync`, { method: 'POST' })
+        .then(async (res) => {
+          if (res.ok) {
+            const synced = await res.json() as RequestDetail
+            setRequestDetail(synced)
+          }
+        }).catch(() => {})
       const [detailResponse, historyResponse] = await Promise.all([apiFetch(`/api/requests/${request.backendId}`), apiFetch(`/api/requests/${request.backendId}/history`)] )
       if (!detailResponse.ok || !historyResponse.ok) throw new Error('Request details could not be loaded.')
       setRequestDetail(await detailResponse.json() as RequestDetail)
@@ -1145,6 +1203,13 @@ export default function App() {
    */
   async function openIncident(id: string) {
     try {
+      void apiFetch(`/api/incidents/${id}/sync`, { method: 'POST' })
+        .then(async (res) => {
+          if (res.ok) {
+            const synced = await res.json() as IncidentDetailRecord
+            setIncidentDetail(synced)
+          }
+        }).catch(() => {})
       const response = await apiFetch(`/api/incidents/${id}`)
       if (!response.ok) throw new Error('Incident details could not be loaded.')
       setIncidentDetail(await response.json() as IncidentDetailRecord); setActive('Incident Detail'); navigate(`/incidents/${id}`)
@@ -1171,116 +1236,41 @@ export default function App() {
     await openIncident(incidentDetail.incident.id); await loadWorkspace()
   }
 
-  return <Box className="app-shell">
-    <Box component="aside" className="sidebar">
-      <Box className="brand">
-        <Box
-          className="brand-mark"
-          sx={{
-            background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%)',
-            boxShadow: '0 4px 12px rgba(2, 132, 199, 0.35)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            p: '5px',
-          }}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L20.66 7V17L12 22L3.34 17V7L12 2Z" stroke="#ffffff" strokeWidth="2" strokeLinejoin="round" />
-            <path d="M12 12L12 22M12 12L20.66 7M12 12L3.34 7" stroke="#bae6fd" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="12" cy="12" r="2.5" fill="#ffffff" />
-            <circle cx="12" cy="4" r="1.5" fill="#bae6fd" />
-            <circle cx="19" cy="16" r="1.5" fill="#bae6fd" />
-            <circle cx="5" cy="16" r="1.5" fill="#bae6fd" />
-          </svg>
-        </Box>
-        <Box>
-          <Typography className="brand-name">ITSM</Typography>
-          <Typography className="brand-caption">SERVICE HUB</Typography>
-        </Box>
-      </Box>
-      <Box className="workspace-label">WORKSPACE</Box>
-      <List className="nav-list" disablePadding>
-        {(isManagerAdmin
-          ? [
-              { label: 'Admin dashboard', icon: <AnalyticsRounded /> },
-              { label: 'Service catalog', icon: <SearchRounded /> },
-              { label: 'Requests', icon: <ReceiptLongRounded /> },
-            ]
-          : employeeNav
-        ).map((item) => <ListItemButton key={item.label} selected={active === item.label || (isManagerAdmin && item.label === 'Admin dashboard' && active === 'Overview')} onClick={() => { setSelectedService(null); setRequestFields({}); setActive(item.label) }} className="nav-item">
-          <ListItemIcon>{item.icon}</ListItemIcon><ListItemText primary={item.label} />
-        </ListItemButton>)}
-        <ListItemButton selected={active === incidentNav.label} onClick={() => { setSelectedService(null); setActive(incidentNav.label) }} className="nav-item"><ListItemIcon>{incidentNav.icon}</ListItemIcon><ListItemText primary={incidentNav.label} /></ListItemButton>
-        <ListItemButton selected={active === problemNav.label} onClick={() => { setSelectedService(null); setActive(problemNav.label) }} className="nav-item"><ListItemIcon>{problemNav.icon}</ListItemIcon><ListItemText primary={problemNav.label} /></ListItemButton>
-        <ListItemButton selected={active === changeNav.label} onClick={() => { setSelectedService(null); setActive(changeNav.label) }} className="nav-item"><ListItemIcon>{changeNav.icon}</ListItemIcon><ListItemText primary={changeNav.label} /></ListItemButton>
-      </List>
-      {isManagerAdmin && <><Box className="workspace-label management-label">MANAGEMENT</Box><List className="nav-list" disablePadding>
-        {[
-          { label: 'Approvals', icon: <TaskAltRounded /> },
-          { label: 'User access', icon: <ManageAccountsRounded /> },
-        ].map((item) => <ListItemButton key={item.label} selected={active === item.label} onClick={() => { setSelectedService(null); setRequestFields({}); setActive(item.label) }} className="nav-item">
-          <ListItemIcon>{item.icon}</ListItemIcon><ListItemText primary={item.label} />
-        </ListItemButton>)}
-      </List></>}
-      <Box className="sidebar-bottom"><Divider /><ListItemButton onClick={() => { setSelectedService(null); setRequestFields({}); setActive('Settings') }} className="nav-item settings-item"><ListItemIcon><SettingsOutlined /></ListItemIcon><ListItemText primary="Settings" /></ListItemButton>
-        <Box className="profile">
-          <Avatar className="profile-avatar">{initials}</Avatar>
-          <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden', mr: 0.5 }}>
-            <Typography className="profile-name" title={user.fullName} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user.fullName}
-            </Typography>
-            <Typography className="profile-role" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user.role === 'MANAGER_ADMIN' ? 'Manager + Administrator' : 'Employee'}
-            </Typography>
-          </Box>
-          <IconButton
-            aria-label="Sign out"
-            size="small"
-            title="Sign out"
-            onClick={logout}
-            sx={{ flexShrink: 0, color: '#64748b', p: 0.5, '&:hover': { color: '#ef4444', bgcolor: '#fee2e2' } }}
-          >
-            <LogoutRounded fontSize="small" />
-          </IconButton>
-        </Box>
-      </Box>
-    </Box>
-
-    <Box className="main-column">
-      <AppBar position="static" elevation={0} color="transparent" className="topbar"><Toolbar className="topbar-inner">
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<ArrowBackRounded sx={{ fontSize: 16 }} />}
-            onClick={handleGlobalBack}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: 12,
-              borderColor: '#cbd5e1',
-              color: '#334155',
-              bgcolor: '#ffffff',
-              px: 1.25,
-              py: 0.35,
-              minHeight: 28,
-              borderRadius: 1,
-              boxShadow: 'none',
-              '&:hover': { bgcolor: '#f8fafc', borderColor: '#94a3b8' },
-            }}
-          >
-            Back
-          </Button>
-          <Typography className="crumb">Workspace <span>/</span> {active}</Typography>
-        </Box>
-        <Box className="topbar-actions"><TextField inputRef={searchRef} size="small" placeholder="Search services" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { setSelectedService(null); setRequestFields({}); setActive('Service catalog') } }} className="search-field" slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded fontSize="small" /></InputAdornment>, endAdornment: <InputAdornment position="end"><IconButton aria-label="Search services" size="small" onClick={() => { setSelectedService(null); setRequestFields({}); setActive('Service catalog') }}><SearchRounded fontSize="small" /></IconButton><kbd>Ctrl K</kbd></InputAdornment> } }} />
-          <IconButton aria-label="Notifications" className="notification-button" onClick={(event) => setNotificationsAnchor(event.currentTarget)}>
-            <Badge color="error" badgeContent={unreadCount} max={99}>
-              <NotificationsNoneRounded />
-            </Badge>
-          </IconButton>
-          <IconButton aria-label="Open account menu" onClick={(event) => setProfileAnchor(event.currentTarget)} sx={{ p: 0 }}><Avatar className="top-avatar">{initials}</Avatar></IconButton>
+  return (
+    <LiventoAppShell
+      user={user}
+      active={active}
+      setActive={(page: string) => {
+        if (page === 'Incidents') { setSelectedService(null); setRequestFields({}); setActive('Incidents') }
+        else if (page === 'Service Catalog') { setSelectedService(null); setRequestFields({}); setActive('Service catalog') }
+        else if (page === 'Requests') { setSelectedService(null); setRequestFields({}); setActive('Requests') }
+        else if (page === 'Changes') { setSelectedService(null); setRequestFields({}); setActive('Changes') }
+        else if (page === 'Problems') { setSelectedService(null); setRequestFields({}); setActive('Problems') }
+        else if (page === 'ServiceNow Sync') { setSelectedService(null); setRequestFields({}); setActive('ServiceNow Sync') }
+        else if (page === 'Dashboard') { setSelectedService(null); setRequestFields({}); setActive(isManagerAdmin ? 'Admin dashboard' : 'Dashboard') }
+        else { setSelectedService(null); setRequestFields({}); setActive(page) }
+      }}
+      incidentsList={incidentRows}
+      requestsList={requests}
+      openIncidentsCount={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status)).length}
+      p1IncidentsCount={incidentRows.filter((i) => i.priority?.includes('1') || i.priority?.toLowerCase().includes('critical')).length}
+      requestsCount={requests.length}
+      pendingApprovalsCount={approvals.length}
+      problemsCount={problems.filter((p) => !['RESOLVED', 'CLOSED'].includes(p.status?.toUpperCase() || '')).length}
+      changesCount={changesCount}
+      catalogItems={liveCatalog.map((item) => ({ name: item.name || '', description: item.short_description || '', category: typeof item.category === 'object' ? item.category?.display_value : item.category }))}
+      onOpenIncident={openIncident}
+      onOpenRequest={openRequest}
+      onNewIncident={() => void openNewIncidentForm()}
+      onNewRequest={() => setActive('Service catalog')}
+      onSelectService={(service: string) => { setSelectedService(service); navigate(`/requests/new?service=${encodeURIComponent(service)}`) }}
+      unreadCount={unreadCount}
+      onNotificationClick={(event: React.MouseEvent<HTMLElement>) => setNotificationsAnchor(event.currentTarget)}
+      onProfileClick={(event: React.MouseEvent<HTMLElement>) => setProfileAnchor(event.currentTarget)}
+      onRefresh={loadWorkspace}
+      setToast={setToast}
+      onLogout={logout}
+    >
           <Menu
             anchorEl={notificationsAnchor}
             open={Boolean(notificationsAnchor)}
@@ -1477,11 +1467,8 @@ export default function App() {
               </Button>
             </Box>
           </Menu>
-          <Menu anchorEl={profileAnchor} open={Boolean(profileAnchor)} onClose={() => setProfileAnchor(null)}><Box sx={{ px: 2, py: 1.25 }}><Typography sx={{ fontWeight: 700, fontSize: 13 }}>{user.fullName}</Typography><Typography color="text.secondary" sx={{ fontSize: 11 }}>@{user.username || user.email.split('@')[0]} · {user.employeeId || 'EMP-ADMIN'} · {user.email}</Typography><Typography color="text.secondary" sx={{ fontSize: 10, mt: .5 }}>{isManagerAdmin ? 'Manager + Administrator' : 'Employee'}</Typography></Box><Divider />{isManagerAdmin && !isImpersonating && <MenuItem onClick={() => { setProfileAnchor(null); setImpersonationUserId(''); setImpersonationOpen(true) }}>Test as user</MenuItem>}<MenuItem onClick={() => { setProfileAnchor(null); setSelectedService(null); setRequestFields({}); setActive('Settings') }}>Account settings</MenuItem><MenuItem onClick={() => { setProfileAnchor(null); logout() }}>Sign out</MenuItem></Menu>
-        </Box>
-      </Toolbar></AppBar>
-
-      <Box component="main" className="page-content">
+          <Menu anchorEl={profileAnchor} open={Boolean(profileAnchor)} onClose={() => setProfileAnchor(null)}><Box sx={{ px: 2, py: 1.25 }}><Typography sx={{ fontWeight: 700, fontSize: 13 }}>{user.fullName}</Typography><Typography color="text.secondary" sx={{ fontSize: 11 }}>@{user.username || user.email.split('@')[0]} · {user.employeeId || 'EMP-ADMIN'} · {user.email}</Typography><Typography color="text.secondary" sx={{ fontSize: 10, mt: .5 }}>{user.role === 'MANAGER_ADMIN' ? 'Manager + Administrator' : user.role === 'MANAGER' ? 'Manager (Hierarchy)' : 'Employee'}{user.orgGroup ? ` · ${user.orgGroup.replaceAll('_', ' ')}` : ''}{user.managerName ? ` · Reports to ${user.managerName}` : ''}</Typography></Box><Divider />{isManagerAdmin && !isImpersonating && <MenuItem onClick={() => { setProfileAnchor(null); setImpersonationUserId(''); setImpersonationOpen(true) }}>Test as user</MenuItem>}<MenuItem onClick={() => { setProfileAnchor(null); setSelectedService(null); setRequestFields({}); setActive('Settings') }}>Account settings</MenuItem><MenuItem onClick={() => { setProfileAnchor(null); logout() }}>Sign out</MenuItem></Menu>
+      <Box className="livento-page-body">
         {isImpersonating && <Alert severity="warning" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={() => { stopImpersonating(); setActive('Overview') }}>Stop testing</Button>}>Testing as <strong>{user.fullName}</strong> ({user.email}). Actions you take will be saved to this user’s account.</Alert>}
         <Dialog open={impersonationOpen} onClose={() => !impersonationBusy && setImpersonationOpen(false)} fullWidth maxWidth="sm">
           <DialogTitle>Test as a user</DialogTitle>
@@ -1520,8 +1507,64 @@ export default function App() {
                   Reported by {incidentDetail.incident.caller || incidentDetail.incident.reporterId} · {new Date(incidentDetail.incident.createdAt).toLocaleString()}
                 </Typography>
               </Box>
-              <Chip label={incidentDetail.incident.state || incidentDetail.incident.status} color="primary" />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<SyncRounded />}
+                  onClick={async () => {
+                    try {
+                      const res = await apiFetch(`/api/incidents/${incidentDetail.incident.id}/sync`, { method: 'POST' })
+                      if (res.ok) {
+                        const updated = await res.json()
+                        setIncidentDetail(updated)
+                        setToast('Incident synchronized with ServiceNow.')
+                        void loadWorkspace()
+                      } else {
+                        setToast('Incident sync completed.')
+                      }
+                    } catch {
+                      setToast('Could not sync incident with ServiceNow.')
+                    }
+                  }}
+                >
+                  Sync with ServiceNow
+                </Button>
+                <Chip label={incidentDetail.incident.state || incidentDetail.incident.status} color="primary" />
+              </Box>
             </Box>
+
+            {incidentDetail.incident.syncStatus && incidentDetail.incident.syncStatus !== 'SYNCED' && (
+              <Alert
+                severity={incidentDetail.incident.syncStatus === 'FAILED' ? 'error' : 'warning'}
+                action={
+                  <Button
+                    color="inherit"
+                    size="small"
+                    onClick={async () => {
+                      try {
+                        const res = await apiFetch(`/api/incidents/${incidentDetail.incident.id}/retry`, { method: 'POST' })
+                        if (res.ok) {
+                          const updated = await res.json()
+                          setIncidentDetail(updated)
+                          setToast('Incident retry succeeded and synced with ServiceNow.')
+                          void loadWorkspace()
+                        } else {
+                          setToast('Incident retry failed.')
+                        }
+                      } catch {
+                        setToast('Error retrying incident sync.')
+                      }
+                    }}
+                  >
+                    Retry Now
+                  </Button>
+                }
+                sx={{ my: 2 }}
+              >
+                ServiceNow Outage / Sync Pending: {incidentDetail.incident.syncError || 'Queued for automatic background retry.'}
+              </Alert>
+            )}
 
             <Box className="sn-detail-grid">
               <Box className="sn-detail-item"><Typography className="sn-detail-label">Incident Number</Typography><Typography className="sn-detail-value">{incidentDetail.incident.incidentNumber || incidentDetail.incident.id}</Typography></Box>
@@ -1535,6 +1578,7 @@ export default function App() {
               <Box className="sn-detail-item"><Typography className="sn-detail-label">Impact</Typography><Typography className="sn-detail-value">{incidentDetail.incident.impact || '3 - Low'}</Typography></Box>
               <Box className="sn-detail-item"><Typography className="sn-detail-label">Urgency</Typography><Typography className="sn-detail-value">{incidentDetail.incident.urgency || '3 - Low'}</Typography></Box>
               <Box className="sn-detail-item"><Typography className="sn-detail-label">Priority</Typography><Typography className="sn-detail-value">{incidentDetail.incident.priority}</Typography></Box>
+              <Box className="sn-detail-item"><Typography className="sn-detail-label">Assignment group</Typography><Typography className="sn-detail-value">{incidentDetail.incident.assignmentGroup || 'Incident Management'}</Typography></Box>
               <Box className="sn-detail-item"><Typography className="sn-detail-label">Assigned to</Typography><Typography className="sn-detail-value">{incidentDetail.incident.assignedTo || incidentDetail.incident.assigneeId || 'Unassigned'}</Typography></Box>
             </Box>
 
@@ -1605,7 +1649,7 @@ export default function App() {
             onRefreshWorkspace={loadWorkspace}
             onAddItem={() => setActive('Service catalog')}
           />
-        ) : selectedService ? <ServiceRequestForm service={selectedService} values={requestFields} setValues={setRequestFields} approvers={approvers} approversLoading={approversLoading} busy={busy} onCancel={() => { setSelectedService(null); setRequestFields({}) }} onSubmit={() => void submitRequest(selectedService)} /> : active === 'Request receipt' && receipt ? <RequestReceipt receipt={receipt} onRequests={() => setActive('Requests')} onCatalog={() => setActive('Service catalog')} /> : active === 'Settings' ? <PasswordSettings onNavigate={(page) => setActive(page)} setToast={setToast} /> : active === 'User access' && isManagerAdmin ? <UserAccessPage /> : (active === 'Admin dashboard' || (isManagerAdmin && (active === 'Overview' || active === 'Dashboard'))) ? <SharedAdminDashboard requestsCount={requests.length} pendingApprovalsCount={approvals.length} openIncidentsCount={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status)).length} p1IncidentsCount={incidentRows.filter((i) => i.priority?.includes('1') || i.priority?.toLowerCase().includes('critical')).length} problemsCount={problems.filter((p) => !['RESOLVED', 'CLOSED'].includes(p.status?.toUpperCase() || '')).length} changesCount={changesCount} incidentsList={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status))} requestsList={requests} onNavigate={(page) => setActive(page)} onRefresh={loadWorkspace} onOpenIncident={openIncident} onOpenRequest={openRequest} onBack={handleGlobalBack} setToast={setToast} /> : active === 'Incidents' ? (
+        ) : selectedService ? <ServiceRequestForm service={selectedService} dynamicForm={dynamicFormDef} values={requestFields} setValues={setRequestFields} approvers={approvers} approversLoading={approversLoading} busy={busy} onCancel={() => { setSelectedService(null); setDynamicFormDef(null); setRequestFields({}) }} onSubmit={() => void submitRequest(selectedService)} /> : active === 'Request receipt' && receipt ? <RequestReceipt receipt={receipt} onRequests={() => setActive('Requests')} onCatalog={() => setActive('Service catalog')} /> : active === 'Settings' ? <PasswordSettings onNavigate={(page) => setActive(page)} setToast={setToast} /> : active === 'User access' && isManagerAdmin ? <UserAccessPage /> : (active === 'Admin dashboard' || (isManagerAdmin && (active === 'Overview' || active === 'Dashboard'))) ? <SharedAdminDashboard requestsCount={requests.length} pendingApprovalsCount={approvals.length} openIncidentsCount={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status)).length} p1IncidentsCount={incidentRows.filter((i) => i.priority?.includes('1') || i.priority?.toLowerCase().includes('critical')).length} problemsCount={problems.filter((p) => !['RESOLVED', 'CLOSED'].includes(p.status?.toUpperCase() || '')).length} changesCount={changesCount} incidentsList={incidentRows.filter((i) => !['RESOLVED','CLOSED'].includes(i.status))} requestsList={requests} onNavigate={(page) => setActive(page)} onRefresh={loadWorkspace} onOpenIncident={openIncident} onOpenRequest={openRequest} onBack={handleGlobalBack} setToast={setToast} /> : active === 'Incidents' ? (
           <Paper className="content-card">
             <Box className="section-heading in-card">
               <Box>
@@ -2167,9 +2211,9 @@ export default function App() {
           />
         ) : active === 'Service catalog' ? <>
           <Paper className="catalog-banner"><Box><Typography className="banner-kicker">SERVICE CATALOG</Typography><Typography variant="h5" className="banner-title">How can we help?</Typography><Typography className="banner-copy">Find the right service and we’ll take it from there.</Typography></Box><SupportAgentRounded className="banner-art" /></Paper>
-          <Box className="catalog-toolbar"><Box><Typography variant="h6">Browse by team</Typography><Typography className="section-note">Choose a team to narrow the service list.</Typography></Box><Box className="catalog-filters">{['All teams', 'IT', 'Facilities', 'HR'].map((team) => <Chip key={team} label={team} clickable color={catalogFilter === team ? 'primary' : 'default'} variant={catalogFilter === team ? 'filled' : 'outlined'} onClick={() => setCatalogFilter(team)} />)}</Box></Box>
+          <Box className="catalog-toolbar"><Box><Typography variant="h6">Browse by team</Typography><Typography className="section-note">Choose a team to narrow the service list.</Typography></Box><Box className="catalog-filters">{['All teams', 'IT', 'Asset Procurement', 'Facilities', 'HR'].map((team) => <Chip key={team} label={team} clickable color={catalogFilter === team ? 'primary' : 'default'} variant={catalogFilter === team ? 'filled' : 'outlined'} onClick={() => setCatalogFilter(team)} />)}</Box></Box>
           {!liveCatalog.length && <Alert severity="warning" sx={{ mb: 2 }}>The live catalog is unavailable. These sample services can be used for local requests.</Alert>}<Box className="section-heading catalog-list-heading"><Box><Typography variant="h6">Available services</Typography><Typography className="section-note">{displayedCatalog.length} {displayedCatalog.length === 1 ? 'service' : 'services'} match your selection.</Typography></Box><Chip label={liveCatalog.length ? (catalogStale ? 'Last known data' : 'ServiceNow catalog') : 'Sample catalog'} variant="outlined" /></Box>
-          <Box className="service-grid">{displayedCatalog.map((service, index) => <ButtonBase component={Paper} key={`${service.title}-${index}`} className="service-card" aria-label={`Start request: ${service.title}`} onClick={() => void openServiceForm(service.title)}><Box className={`service-icon ${service.tint}`}>{service.icon}</Box><Chip size="small" label={service.group} className="group-chip" /><Typography className="service-title">{service.title}</Typography><Typography className="service-description">{service.description}</Typography><Box className="service-action">Start a request <KeyboardArrowRightRounded /></Box></ButtonBase>)}</Box>
+          <Box className="service-grid">{displayedCatalog.map((service, index) => <ButtonBase component={Paper} key={`${service.title}-${index}`} className="service-card" aria-label={`Start request: ${service.title}`} onClick={() => void openServiceForm(service.title, service.id)}><Box className={`service-icon ${service.tint}`}>{service.icon}</Box><Chip size="small" label={service.group} className="group-chip" /><Typography className="service-title">{service.title}</Typography><Typography className="service-description">{service.description}</Typography><Box className="service-action">Start a request <KeyboardArrowRightRounded /></Box></ButtonBase>)}</Box>
         </> : (active === 'Requests' || active === 'My requests') ? <>
           {isManagerAdmin ? (
             <Paper className="content-card"><Box className="section-heading in-card"><Box><Typography variant="h6">Request queue</Typography><Typography className="section-note">Review requests from employees or start a new request from the service catalog.</Typography></Box><Button variant="contained" startIcon={<ControlPointRounded />} onClick={() => setActive('Service catalog')}>Add new request</Button></Box>
@@ -2207,7 +2251,7 @@ export default function App() {
           </Box>
           <Box className="service-grid quick-grid">
             {(displayedCatalog.length ? displayedCatalog : services).slice(0, 4).map((service, index) => (
-              <ButtonBase component={Paper} key={`${service.title}-${index}`} className="service-card quick-card" aria-label={`Start request: ${service.title}`} onClick={() => void openServiceForm(service.title)}>
+              <ButtonBase component={Paper} key={`${service.title}-${index}`} className="service-card quick-card" aria-label={`Start request: ${service.title}`} onClick={() => void openServiceForm(service.title, 'id' in service ? (service as { id?: string }).id : undefined)}>
                 <Box className={`service-icon ${service.tint}`}>{service.icon}</Box>
                 <Chip size="small" label={service.group} className="group-chip" />
                 <Typography className="service-title">{service.title}</Typography>
@@ -2220,7 +2264,6 @@ export default function App() {
         </Box>
         <Box className="footer"><span>ITSM · Internal Service Hub</span><span>Need help? Contact your service desk</span></Box>
       </Box>
-    </Box>
     {selectedArticle && (
       <Dialog open onClose={() => setSelectedArticle(null)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2575,7 +2618,8 @@ export default function App() {
         )}
       </DialogContent>
     </Dialog>
-  </Box>
+  </LiventoAppShell>
+  )
 }
 
 function RequestDetailReport({
@@ -2601,7 +2645,7 @@ function RequestDetailReport({
   onRefreshWorkspace: () => Promise<void>
   onAddItem: () => void
 }) {
-  const displayReqNumber = request.requestNumber?.replace(/^NSR-\d{8}-([A-F0-9]{4}).*$/i, 'REQ00000$1') || request.requestNumber || 'REQ0000025'
+  const displayReqNumber = request.fields?.serviceNowReqNumber || (request.requestNumber?.startsWith('REQ') ? request.requestNumber : request.requestNumber?.replace(/^NSR-\d{8}-([A-F0-9]{4}).*$/i, 'REQ00000$1')) || request.requestNumber || 'REQ0000025'
   const resolvedApproverName = approverName || request.description.match(/^Requested approver:\s*(.+)$/m)?.[1]?.trim() || request.approverId || 'Northstar Administrator'
 
   const getItemPrice = (itemName: string): number => {
@@ -2616,7 +2660,7 @@ function RequestDetailReport({
     return 839.99
   }
 
-  const primaryItemName = request.fields?.item || request.fields?.application || request.fields?.requestType || request.fields?.topic || request.serviceName || 'Standard Service Item'
+  const primaryItemName = request.fields?.assetModel || request.fields?.item || request.fields?.application || request.fields?.requestType || request.fields?.topic || request.serviceName || 'Standard Service Item'
   const initialPrice = getItemPrice(primaryItemName)
 
   const [items, setItems] = useState<Array<{
@@ -2637,11 +2681,12 @@ function RequestDetailReport({
       : request.status === 'APPROVED' ? 'fulfillment'
       : 'approved'
 
+    const ritmNumber = request.fields?.serviceNowRitmNumber || (request.fields?.serviceNowNumber?.startsWith('RITM') ? request.fields?.serviceNowNumber : displayReqNumber.replace('REQ', 'RITM') + '46')
     const list = [
       {
         id: '1',
-        number: displayReqNumber.replace('REQ', 'RITM') + '46',
-        quantity: 1,
+        number: ritmNumber,
+        quantity: parseInt(request.fields?.quantity || '1', 10) || 1,
         catalog: 'Service Catalog',
         item: primaryItemName,
         dueDate: rawDue,
@@ -2841,6 +2886,30 @@ function RequestDetailReport({
           <Button className="sn-req-action-btn" disabled={busy} onClick={handleUpdate}>
             Update
           </Button>
+          <Button
+            className="sn-req-action-btn"
+            startIcon={<SyncRounded fontSize="small" />}
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true)
+              try {
+                const res = await apiFetch(`/api/requests/${request.id}/sync`, { method: 'POST' })
+                if (res.ok) {
+                  setToast(`Request ${displayReqNumber} synchronized with ServiceNow.`)
+                  await onRefreshWorkspace()
+                } else {
+                  setToast(`Request ${displayReqNumber} sync completed.`)
+                }
+              } catch {
+                setToast('Could not synchronize with ServiceNow.')
+              } finally {
+                setBusy(false)
+                window.setTimeout(() => setToast(''), 5000)
+              }
+            }}
+          >
+            Sync
+          </Button>
           <Button className="sn-req-action-btn" onClick={() => setAddItemModalOpen(true)}>
             Add New Item
           </Button>
@@ -2895,6 +2964,42 @@ function RequestDetailReport({
         </Box>
       )}
 
+      {/* Outage / Pending Sync Banner */}
+      {request.fields?.syncStatus && request.fields.syncStatus !== 'SYNCED' && (
+        <Alert
+          severity={request.fields.syncStatus === 'FAILED' ? 'error' : 'warning'}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true)
+                try {
+                  const res = await apiFetch(`/api/requests/${request.id}/retry`, { method: 'POST' })
+                  if (res.ok) {
+                    setToast(`Request ${displayReqNumber} retry succeeded and synced with ServiceNow.`)
+                    await onRefreshWorkspace()
+                  } else {
+                    setToast(`Request ${displayReqNumber} retry failed.`)
+                  }
+                } catch {
+                  setToast('ServiceNow retry error.')
+                } finally {
+                  setBusy(false)
+                  window.setTimeout(() => setToast(''), 5000)
+                }
+              }}
+            >
+              Retry Now
+            </Button>
+          }
+          sx={{ mx: 2, mt: 1 }}
+        >
+          ServiceNow Outage / Sync Pending: {request.fields.syncError || 'Queued for automatic background retry.'}
+        </Alert>
+      )}
+
       {/* Main 2-Column Form Body (Required Fields Only, Unwanted Fields Avoided) */}
       <Box className="sn-form-body">
         {/* Left Column */}
@@ -2941,6 +3046,28 @@ function RequestDetailReport({
                   <InfoOutlined fontSize="small" />
                 </IconButton>
               </Box>
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">Stage</Typography>
+            <Box className="sn-field-input-wrap">
+              <input
+                className="sn-input-styled sn-readonly-input"
+                readOnly
+                value={request.fields?.serviceNowStage || (request.status === 'COMPLETED' ? 'Complete' : request.status === 'APPROVED' ? 'Fulfillment' : 'Dept. Head Approval')}
+              />
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row">
+            <Typography className="sn-field-label">Assignment group</Typography>
+            <Box className="sn-field-input-wrap">
+              <input
+                className="sn-input-styled sn-readonly-input"
+                readOnly
+                value={request.fields?.serviceNowAssignmentGroup || 'Hardware Support'}
+              />
             </Box>
           </Box>
 
@@ -3007,11 +3134,22 @@ function RequestDetailReport({
           </Box>
 
           <Box className="sn-field-row">
+            <Typography className="sn-field-label">Assigned to</Typography>
+            <Box className="sn-field-input-wrap">
+              <input
+                className="sn-input-styled sn-readonly-input"
+                readOnly
+                value={request.fields?.serviceNowAssignedTo || 'IT Fulfillment Specialist'}
+              />
+            </Box>
+          </Box>
+
+          <Box className="sn-field-row">
             <Typography className="sn-field-label">Approval</Typography>
             <Box className="sn-field-input-wrap">
               <select
                 className="sn-select-styled"
-                value={approvalState}
+                value={request.fields?.serviceNowApproval || approvalState}
                 onChange={(e) => setApprovalState(e.target.value)}
               >
                 {['Requested', 'Approved', 'Rejected'].map((a) => (
@@ -3341,8 +3479,8 @@ function RequestDetailReport({
  * with quick one-click 'Approve' and 'Reject' actions.
  */
 export function ApprovalQueue({ approvals, onApprove, onReject }: { approvals: Approval[]; onApprove: (id: string) => void; onReject: (id: string) => void }) {
-  if (approvals.length === 0) return <Typography color="text.secondary" sx={{ py: 3 }}>There are no requests awaiting your approval.</Typography>
-  return <Box className="approval-list">{approvals.map((approval) => <Box className="approval-item" key={approval.id}><Avatar className="approval-avatar">{approval.initials}</Avatar><Box className="approval-copy"><Typography className="approval-title">{approval.title}</Typography><Typography className="approval-detail">{approval.requestNumber} · Requested by {approval.employee} · {approval.requested}</Typography></Box><Button size="small" color="success" onClick={() => onApprove(approval.id)}>Approve</Button><Button size="small" color="error" onClick={() => onReject(approval.id)}>Reject</Button></Box>)}</Box>
+  if (approvals.length === 0) return <Typography color="text.secondary" sx={{ py: 3 }}>There are no requests awaiting your approval within your reporting hierarchy.</Typography>
+  return <Box className="approval-list">{approvals.map((approval) => <Box className="approval-item" key={approval.id}><Avatar className="approval-avatar">{approval.initials}</Avatar><Box className="approval-copy"><Typography className="approval-title">{approval.title}</Typography><Typography className="approval-detail">{approval.requestNumber} · Requested by {approval.employee} · {approval.requested}</Typography></Box><Chip size="small" label="Hierarchy Review" variant="outlined" color="primary" sx={{ height: 20, fontSize: 10, mr: 1 }} /><Button size="small" color="success" onClick={() => onApprove(approval.id)}>Approve</Button><Button size="small" color="error" onClick={() => onReject(approval.id)}>Reject</Button></Box>)}</Box>
 }
 
 /**
@@ -3352,10 +3490,37 @@ export function ApprovalQueue({ approvals, onApprove, onReject }: { approvals: A
  * - Dynamically injects conditional fields (e.g. access targets, device specifications).
  * - Enforces required field validation before enabling the 'Submit' button.
  */
-export function ServiceRequestForm({ service, values, setValues, approvers, approversLoading, busy, onCancel, onSubmit }: { service: string; values: Record<string, string>; setValues: (values: Record<string, string>) => void; approvers: Approver[]; approversLoading: boolean; busy: boolean; onCancel: () => void; onSubmit: () => void }) {
-  const { apiFetch } = useAuth()
+export function ServiceRequestForm({ service, dynamicForm, values, setValues, approvers, approversLoading, busy, onCancel, onSubmit }: { service: string; dynamicForm?: { intro: string; fields: RequestField[] } | null; values: Record<string, string>; setValues: (values: Record<string, string>) => void; approvers: Approver[]; approversLoading: boolean; busy: boolean; onCancel: () => void; onSubmit: () => void }) {
+  const { user, apiFetch } = useAuth()
   const [copied, setCopied] = useState(false)
   const currentReqNumber = values.requestNumber || 'REQ0010010'
+
+  useEffect(() => {
+    if (!values.approverId) {
+      if (user?.managerId) {
+        setValues({
+          ...values,
+          approverId: user.managerId,
+          approverName: user.managerName || 'Assigned Personal Manager',
+          orgGroup: user.orgGroup || 'GENERAL',
+        })
+      } else if (approvers.length > 0) {
+        setValues({
+          ...values,
+          approverId: approvers[0].id,
+          approverName: approvers[0].fullName,
+          orgGroup: user?.orgGroup || 'GENERAL',
+        })
+      } else {
+        setValues({
+          ...values,
+          approverId: 'ADMIN_TRIAGE',
+          approverName: 'Administrator Queue',
+          orgGroup: user?.orgGroup || 'GENERAL',
+        })
+      }
+    }
+  }, [user, approvers])
 
   useEffect(() => {
     if (!values.requestNumber) {
@@ -3372,14 +3537,126 @@ export function ServiceRequestForm({ service, values, setValues, approvers, appr
     }
   }, [values.requestNumber, apiFetch])
 
-  const form = serviceForms[service] ?? { intro: 'Select equipment needed. Required fields only.', fields: [
+  const form = dynamicForm ?? serviceForms[service] ?? { intro: 'Select equipment needed. Required fields only.', fields: [
     { name: 'requestType', label: 'What do you need?', kind: 'text' as const, required: true },
     { name: 'neededBy', label: 'When do you need it?', kind: 'date' as const },
     { name: 'reason', label: 'Business reason and details', kind: 'textarea' as const, required: true },
   ] }
-  const specifications = conditionalRequestFields(service, values)
-  const visibleFields = [...form.fields, ...specifications]
-  const canSubmit = visibleFields.filter((field) => field.required).every((field) => values[field.name]?.trim()) && Boolean(values.approverId) && !busy
+  const isFieldVisible = (f: RequestField) => {
+    if (!f.condition) return true
+    const parentVal = String(values[f.condition.dependsOn] ?? '').trim().toLowerCase()
+    const targetVal = String(f.condition.value ?? '').trim().toLowerCase()
+    if (f.condition.action === 'show') {
+      return parentVal === targetVal
+    }
+    if (f.condition.action === 'hide') {
+      return parentVal !== targetVal
+    }
+    return true
+  }
+
+  const isFieldRequired = (f: RequestField) => {
+    if (f.condition && f.condition.action === 'require') {
+      const parentVal = String(values[f.condition.dependsOn] ?? '').trim().toLowerCase()
+      const targetVal = String(f.condition.value ?? '').trim().toLowerCase()
+      if (parentVal === targetVal) return true
+    }
+    return Boolean(f.required)
+  }
+
+  const activeFormFields = form.fields.filter(isFieldVisible)
+  const specifications = dynamicForm ? [] : conditionalRequestFields(service, values)
+  const visibleFields = [...activeFormFields, ...specifications]
+  const canSubmit = visibleFields.filter(isFieldRequired).every((field) => values[field.name]?.trim()) && Boolean(values.approverId) && !busy
+
+  const renderFieldInput = (field: RequestField) => {
+    if (field.kind === 'select') {
+      return (
+        <select
+          className="sn-select-styled"
+          value={values[field.name] ?? ''}
+          onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+        >
+          <option value="">-- Select --</option>
+          {field.options?.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+      )
+    }
+    if (field.kind === 'multi-select') {
+      const selected = (values[field.name] ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+      return (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, py: 0.5 }}>
+          {field.options?.map((opt) => {
+            const isSel = selected.includes(opt)
+            return (
+              <Chip
+                key={opt}
+                label={opt}
+                size="small"
+                clickable
+                color={isSel ? 'primary' : 'default'}
+                variant={isSel ? 'filled' : 'outlined'}
+                onClick={() => {
+                  const next = isSel ? selected.filter((s) => s !== opt) : [...selected, opt]
+                  setValues({ ...values, [field.name]: next.join(', ') })
+                }}
+              />
+            )
+          })}
+        </Box>
+      )
+    }
+    if (field.kind === 'checkbox') {
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
+          <input
+            type="checkbox"
+            id={field.name}
+            checked={values[field.name] === 'true'}
+            onChange={(e) => setValues({ ...values, [field.name]: e.target.checked ? 'true' : 'false' })}
+            style={{ width: 18, height: 18, cursor: 'pointer' }}
+          />
+          <label htmlFor={field.name} style={{ fontSize: 13, color: '#334155', cursor: 'pointer' }}>
+            {field.helper || 'Check to enable'}
+          </label>
+        </Box>
+      )
+    }
+    if (field.kind === 'number') {
+      return (
+        <input
+          type="number"
+          min="1"
+          className="sn-input-styled"
+          value={values[field.name] ?? ''}
+          onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+          placeholder={field.label}
+        />
+      )
+    }
+    if (field.kind === 'textarea') {
+      return (
+        <textarea
+          className="sn-textarea-styled"
+          rows={3}
+          value={values[field.name] ?? ''}
+          onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+          placeholder={field.label}
+        />
+      )
+    }
+    return (
+      <input
+        type={field.kind === 'date' ? 'date' : 'text'}
+        className="sn-input-styled"
+        value={values[field.name] ?? ''}
+        onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
+        placeholder={field.helper || field.label}
+      />
+    )
+  }
 
   return (
     <Box className="sn-form-container">
@@ -3410,7 +3687,7 @@ export function ServiceRequestForm({ service, values, setValues, approvers, appr
         </Box>
       </Box>
 
-      {/* Clean 2-Column Form Body (Required Fields Only) */}
+      {/* Clean 2-Column Form Body */}
       <Box className="sn-form-body">
         <Box className="sn-form-column">
           {/* Auto Generative ID Field */}
@@ -3438,80 +3715,26 @@ export function ServiceRequestForm({ service, values, setValues, approvers, appr
             </Box>
           </Box>
 
-          {form.fields.filter((_, idx) => idx % 2 === 0).map((field) => (
+          {activeFormFields.filter((_, idx) => idx % 2 === 0).map((field) => (
             <Box className="sn-field-row" key={field.name}>
               <Typography className="sn-field-label">
-                {field.required && <span className="sn-required">* </span>}{field.label}
+                {isFieldRequired(field) && <span className="sn-required">* </span>}{field.label}
               </Typography>
               <Box className="sn-field-input-wrap">
-                {field.kind === 'select' ? (
-                  <select
-                    className="sn-select-styled"
-                    value={values[field.name] ?? ''}
-                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
-                  >
-                    <option value="">-- Select --</option>
-                    {field.options?.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                ) : field.kind === 'textarea' ? (
-                  <textarea
-                    className="sn-textarea-styled"
-                    rows={3}
-                    value={values[field.name] ?? ''}
-                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
-                    placeholder={field.label}
-                  />
-                ) : (
-                  <input
-                    type={field.kind === 'date' ? 'date' : 'text'}
-                    className="sn-input-styled"
-                    value={values[field.name] ?? ''}
-                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
-                    placeholder={field.label}
-                  />
-                )}
+                {renderFieldInput(field)}
               </Box>
             </Box>
           ))}
         </Box>
 
         <Box className="sn-form-column">
-          {form.fields.filter((_, idx) => idx % 2 === 1).map((field) => (
+          {activeFormFields.filter((_, idx) => idx % 2 === 1).map((field) => (
             <Box className="sn-field-row" key={field.name}>
               <Typography className="sn-field-label">
-                {field.required && <span className="sn-required">* </span>}{field.label}
+                {isFieldRequired(field) && <span className="sn-required">* </span>}{field.label}
               </Typography>
               <Box className="sn-field-input-wrap">
-                {field.kind === 'select' ? (
-                  <select
-                    className="sn-select-styled"
-                    value={values[field.name] ?? ''}
-                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
-                  >
-                    <option value="">-- Select --</option>
-                    {field.options?.map((opt) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
-                ) : field.kind === 'textarea' ? (
-                  <textarea
-                    className="sn-textarea-styled"
-                    rows={3}
-                    value={values[field.name] ?? ''}
-                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
-                    placeholder={field.label}
-                  />
-                ) : (
-                  <input
-                    type={field.kind === 'date' ? 'date' : 'text'}
-                    className="sn-input-styled"
-                    value={values[field.name] ?? ''}
-                    onChange={(e) => setValues({ ...values, [field.name]: e.target.value })}
-                    placeholder={field.label}
-                  />
-                )}
+                {renderFieldInput(field)}
               </Box>
             </Box>
           ))}
@@ -3519,22 +3742,47 @@ export function ServiceRequestForm({ service, values, setValues, approvers, appr
           {/* Approver field */}
           <Box className="sn-field-row">
             <Typography className="sn-field-label">
-              <span className="sn-required">* </span>Approver
+              <span className="sn-required">* </span>Approval Route
             </Typography>
             <Box className="sn-field-input-wrap">
-              <select
-                className="sn-select-styled"
-                value={values.approverId ?? ''}
-                onChange={(e) => {
-                  const app = approvers.find((a) => a.id === e.target.value)
-                  setValues({ ...values, approverId: e.target.value, approverName: app?.fullName ?? '' })
-                }}
-              >
-                <option value="">{approversLoading ? 'Loading approvers...' : '-- Select Manager or Admin --'}</option>
-                {approvers.map((a) => (
-                  <option key={a.id} value={a.id}>{a.fullName}</option>
-                ))}
-              </select>
+              {user?.managerId && user?.managerName ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                      {user.managerName}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label="Assigned Personal Manager"
+                      color="primary"
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: 10, fontWeight: 700 }}
+                    />
+                  </Box>
+                  <Typography sx={{ fontSize: 11, color: '#64748b' }}>
+                    Approval automatically routes to your designated reporting manager ({user.orgGroup || 'General'}).
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  <select
+                    className="sn-select-styled"
+                    value={values.approverId ?? 'ADMIN_TRIAGE'}
+                    onChange={(e) => {
+                      const app = approvers.find((a) => a.id === e.target.value)
+                      setValues({ ...values, approverId: e.target.value, approverName: app?.fullName ?? 'Administrator Queue' })
+                    }}
+                  >
+                    <option value="ADMIN_TRIAGE">{approversLoading ? 'Loading approvers...' : '-- Administrator Queue (Default Fallback) --'}</option>
+                    {approvers.map((a) => (
+                      <option key={a.id} value={a.id}>{a.fullName}</option>
+                    ))}
+                  </select>
+                  <Typography sx={{ fontSize: 11, color: '#d97706' }}>
+                    No personal manager assigned to your account. Request will safely route to the Administrator queue for triage.
+                  </Typography>
+                </Box>
+              )}
             </Box>
           </Box>
         </Box>

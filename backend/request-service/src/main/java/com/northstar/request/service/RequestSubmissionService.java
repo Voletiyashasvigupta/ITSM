@@ -1,5 +1,6 @@
 package com.northstar.request.service;
 
+import com.northstar.request.client.AuthServiceClient;
 import com.northstar.request.dto.RequestSubmission;
 import com.northstar.request.dto.RequestSubmissionResponse;
 import com.northstar.request.entity.ServiceRequestEntity;
@@ -29,16 +30,19 @@ import org.springframework.web.server.ResponseStatusException;
 public class RequestSubmissionService {
     private final ServiceRequestRepository requests;
     private final RequestSubmissionWriter writer;
+    private final AuthServiceClient authClient;
 
     /**
      * Constructs RequestSubmissionService.
      *
      * @param requests Service request repository.
      * @param writer Transactional writer component.
+     * @param authClient Authentication service client for hierarchy resolution.
      */
-    public RequestSubmissionService(ServiceRequestRepository requests, RequestSubmissionWriter writer) {
+    public RequestSubmissionService(ServiceRequestRepository requests, RequestSubmissionWriter writer, AuthServiceClient authClient) {
         this.requests = requests;
         this.writer = writer;
+        this.authClient = authClient;
     }
 
     /**
@@ -63,8 +67,21 @@ public class RequestSubmissionService {
         String requesterId = authenticatedUserId.trim();
         verifyGatewayIdentity(gatewayIdentity, requesterId);
         String requestedForId = resolveRequestedFor(input.requestedForId(), requesterId, roles);
+
+        // Route approval to employee's assigned personal manager, handling employees without a manager safely
+        String resolvedApproverId = input.approverId();
+        if (resolvedApproverId == null || resolvedApproverId.isBlank() || "auto".equalsIgnoreCase(resolvedApproverId.trim())) {
+            resolvedApproverId = authClient.getPersonalManagerId(requestedForId);
+        }
+        if (resolvedApproverId == null || resolvedApproverId.isBlank()) {
+            // Safe fallback when employee has no personal manager assigned
+            resolvedApproverId = "ADMIN_TRIAGE";
+        } else {
+            resolvedApproverId = resolvedApproverId.trim();
+        }
+
         RequestSubmission authorizedInput = new RequestSubmission(
-                input.serviceName(), input.description(), requestedForId, input.approverId(), input.fields());
+                input.serviceName(), input.description(), requestedForId, resolvedApproverId, input.fields());
         validateServiceFields(authorizedInput);
         ServiceRequestEntity existing = requests.findByIdempotencyKey(idempotencyKey).orElse(null);
         if (existing != null) return existing(existing, requesterId, authorizedInput);
@@ -78,16 +95,49 @@ public class RequestSubmissionService {
 
     private static void validateServiceFields(RequestSubmission input) {
         var fields = input.fields() == null ? java.util.Map.<String, String>of() : input.fields();
-        java.util.List<String> required = switch (input.serviceName().trim()) {
-            case "Request a device" -> java.util.List.of("item", "reason");
-            case "Access and accounts" -> java.util.List.of("accessType", "reason");
-            case "Workplace services" -> java.util.List.of("requestType", "reason");
-            case "People support" -> java.util.List.of("topic", "reason");
-            default -> java.util.List.of("reason");
-        };
-        var missing = required.stream().filter(key -> fields.get(key) == null || fields.get(key).isBlank()).toList();
-        if (!missing.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Missing required request fields: " + String.join(", ", missing));
+        String service = input.serviceName().trim();
+
+        if ("Asset purchase".equalsIgnoreCase(service) || "Purchase an asset".equalsIgnoreCase(service)) {
+            boolean hasCategory = (fields.get("assetCategory") != null && !fields.get("assetCategory").isBlank())
+                    || (fields.get("assetType") != null && !fields.get("assetType").isBlank());
+            if (!hasCategory) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing required request fields: assetType or assetCategory");
+            }
+            if (fields.get("assetModel") == null || fields.get("assetModel").isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing required request fields: assetModel");
+            }
+            if (fields.get("reason") == null || fields.get("reason").isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing required request fields: reason");
+            }
+            // Quantity validation if present
+            if (fields.get("quantity") != null && !fields.get("quantity").isBlank()) {
+                try {
+                    int qty = Integer.parseInt(fields.get("quantity").replace("+", "").trim());
+                    if (qty <= 0) throw new NumberFormatException();
+                } catch (NumberFormatException e) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Field 'quantity' must be a positive integer");
+                }
+            }
+            // Conditional validation: if isExpedited is true, expeditedJustification is required
+            if ("true".equalsIgnoreCase(fields.get("isExpedited"))) {
+                String expeditedJust = fields.get("expeditedJustification");
+                if (expeditedJust == null || expeditedJust.isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Expedited shipping justification is required when expedited priority is requested");
+                }
+            }
+        } else {
+            java.util.List<String> required = switch (service) {
+                case "Request a device" -> java.util.List.of("item", "reason");
+                case "Access and accounts" -> java.util.List.of("accessType", "reason");
+                case "Workplace services" -> java.util.List.of("requestType", "reason");
+                case "People support" -> java.util.List.of("topic", "reason");
+                default -> java.util.List.of("reason");
+            };
+            var missing = required.stream().filter(key -> fields.get(key) == null || fields.get(key).isBlank()).toList();
+            if (!missing.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Missing required request fields: " + String.join(", ", missing));
+        }
+
         if (fields.size() > 100 || fields.entrySet().stream().anyMatch(e -> e.getKey().length() > 100 || (e.getValue() != null && e.getValue().length() > 4000)))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request fields exceed the allowed size");
         for (String key : java.util.List.of("neededBy","accessStart","accessEnd","startDate")) {

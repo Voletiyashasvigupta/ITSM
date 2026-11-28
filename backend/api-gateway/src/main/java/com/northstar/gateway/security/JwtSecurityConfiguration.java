@@ -63,6 +63,7 @@ public class JwtSecurityConfiguration {
                         .pathMatchers("/api/admin/**", "/api/auth/admin/**", "/api/integration/status")
                         .hasRole("MANAGER_ADMIN")
                         .pathMatchers("/api/audit/**").hasAnyRole("MANAGER_ADMIN", "AUDITOR")
+                        .pathMatchers("/api/auth/internal/**").denyAll()
                         .anyExchange().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(jwt -> jwt
                         .jwtAuthenticationConverter(new ReactiveJwtAuthenticationConverterAdapter(jwtAuthenticationConverter))))
@@ -122,9 +123,11 @@ public class JwtSecurityConfiguration {
                 for (Object value : roles) {
                     if (!(value instanceof String role)) continue;
                     String normalized = role.trim().toUpperCase(Locale.ROOT);
-                    if (normalized.equals("MANAGER") || normalized.equals("ADMIN")
-                            || normalized.equals("ADMINISTRATOR") || normalized.equals("MANAGER_ADMIN")) {
+                    if (normalized.equals("ADMIN") || normalized.equals("ADMINISTRATOR") || normalized.equals("MANAGER_ADMIN")) {
                         authorities.add(new SimpleGrantedAuthority("ROLE_MANAGER_ADMIN"));
+                        authorities.add(new SimpleGrantedAuthority("ROLE_MANAGER"));
+                    } else if (normalized.equals("MANAGER")) {
+                        authorities.add(new SimpleGrantedAuthority("ROLE_MANAGER"));
                     } else if (normalized.matches("EMPLOYEE|APPROVER|FULFILLER|SERVICE_DESK_AGENT|HR_ADMINISTRATOR|AUDITOR")) {
                         authorities.add(new SimpleGrantedAuthority("ROLE_" + normalized));
                     }

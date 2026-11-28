@@ -30,14 +30,14 @@ $headers = @{
 }
 
 # 2. Seed Users
-Write-Host "`n[2/6] Seeding Users..." -ForegroundColor Yellow
+Write-Host "`n[2/6] Seeding Users with Organizational Groups and Reporting Hierarchy..." -ForegroundColor Yellow
 $users = @(
-    @{ fullName = "Alex Rivera"; username = "alex.rivera"; employeeId = "EMP-10001"; email = "alex.rivera@northstar.local"; role = "MANAGER_ADMIN"; department = "SOFTWARE_ENGINEERING" },
-    @{ fullName = "Sarah Jenkins"; username = "sarah.jenkins"; employeeId = "EMP-10002"; email = "sarah.jenkins@northstar.local"; role = "MANAGER_ADMIN"; department = "IT" },
-    @{ fullName = "Elena Rostova"; username = "elena.rostova"; employeeId = "EMP-10003"; email = "elena.rostova@northstar.local"; role = "EMPLOYEE"; department = "CUSTOMER_SUPPORT" },
-    @{ fullName = "David Kim"; username = "david.kim"; employeeId = "EMP-10004"; email = "david.kim@northstar.local"; role = "EMPLOYEE"; department = "FINANCE" },
-    @{ fullName = "Priya Patel"; username = "priya.patel"; employeeId = "EMP-10005"; email = "priya.patel@northstar.local"; role = "EMPLOYEE"; department = "HUMAN_RESOURCES" },
-    @{ fullName = "Marcus Vance"; username = "marcus.vance"; employeeId = "EMP-10006"; email = "marcus.vance@northstar.local"; role = "EMPLOYEE"; department = "OPERATIONS" }
+    @{ fullName = "Sarah Jenkins"; username = "sarah.jenkins"; employeeId = "EMP-10002"; email = "sarah.jenkins@northstar.local"; role = "MANAGER_ADMIN"; department = "IT"; orgGroup = "COMPANY_INFRASTRUCTURE"; managerUsername = $null },
+    @{ fullName = "Alex Rivera"; username = "alex.rivera"; employeeId = "EMP-10001"; email = "alex.rivera@northstar.local"; role = "MANAGER"; department = "SOFTWARE_ENGINEERING"; orgGroup = "COMPANY_INFRASTRUCTURE"; managerUsername = "sarah.jenkins" },
+    @{ fullName = "Elena Rostova"; username = "elena.rostova"; employeeId = "EMP-10003"; email = "elena.rostova@northstar.local"; role = "EMPLOYEE"; department = "CUSTOMER_SUPPORT"; orgGroup = "COMPANY_INFRASTRUCTURE"; managerUsername = "alex.rivera" },
+    @{ fullName = "David Kim"; username = "david.kim"; employeeId = "EMP-10004"; email = "david.kim@northstar.local"; role = "EMPLOYEE"; department = "FINANCE"; orgGroup = "CORPORATE"; managerUsername = "sarah.jenkins" },
+    @{ fullName = "Priya Patel"; username = "priya.patel"; employeeId = "EMP-10005"; email = "priya.patel@northstar.local"; role = "EMPLOYEE"; department = "HUMAN_RESOURCES"; orgGroup = "GENERAL"; managerUsername = "sarah.jenkins" },
+    @{ fullName = "Marcus Vance"; username = "marcus.vance"; employeeId = "EMP-10006"; email = "marcus.vance@northstar.local"; role = "EMPLOYEE"; department = "OPERATIONS"; orgGroup = "COMPANY_INFRASTRUCTURE"; managerUsername = "alex.rivera" }
 )
 
 foreach ($u in $users) {
@@ -50,11 +50,44 @@ foreach ($u in $users) {
             temporaryPassword = "Password12345!"
             role = $u.role
             department = $u.department
+            orgGroup = $u.orgGroup
         } | ConvertTo-Json
         $res = Invoke-RestMethod -Uri "$baseUrl/api/auth/admin/users" -Method Post -Headers $headers -Body $body
         Write-Host "  + Created user: $($u.fullName) [$($u.employeeId) / @$($u.username) / $($u.email)]" -ForegroundColor Green
     } catch {
         Write-Host "  . User already exists or active: $($u.username) ($($u.email))" -ForegroundColor Gray
+    }
+}
+
+# Refresh directory to resolve IDs for hierarchy assignment
+$allUsers = Invoke-RestMethod -Uri "$baseUrl/api/auth/admin/users" -Headers $headers
+$userMap = @{}
+foreach ($u in $allUsers) {
+    $userMap[$u.username] = $u
+    $userMap[$u.email] = $u
+}
+
+# Assign reporting manager hierarchy and organizational groups
+Write-Host "`n  -> Linking Reporting Managers & Org Groups..." -ForegroundColor Yellow
+foreach ($u in $users) {
+    $existing = $userMap[$u.username]
+    if ($existing) {
+        $mgrId = $null
+        if ($u.managerUsername -and $userMap[$u.managerUsername]) {
+            $mgrId = $userMap[$u.managerUsername].id
+        }
+        $accessBody = @{
+            role = $u.role
+            department = $u.department
+            orgGroup = $u.orgGroup
+            managerId = $mgrId
+        } | ConvertTo-Json
+        try {
+            Invoke-RestMethod -Uri "$baseUrl/api/auth/admin/users/$($existing.id)/access" -Method Put -Headers $headers -Body $accessBody | Out-Null
+            Write-Host "  ✓ Assigned $($u.fullName): Role=$($u.role), OrgGroup=$($u.orgGroup), Manager=$($u.managerUsername)" -ForegroundColor Cyan
+        } catch {
+            Write-Host "  ! Could not assign access for $($u.fullName): $_" -ForegroundColor Red
+        }
     }
 }
 
@@ -152,11 +185,14 @@ foreach ($req in $requests) {
             "Content-Type" = "application/json"
             "Idempotency-Key" = [System.Guid]::NewGuid().ToString()
         }
+        $targetUser = $userMap[$req.requestedFor]
+        $targetApproverId = if ($targetUser -and $targetUser.managerId) { $targetUser.managerId } else { $adminId }
+
         $body = @{
             serviceName = $req.serviceName
             description = $req.description
-            requestedForId = $req.requestedFor
-            approverId = $adminId
+            requestedForId = if ($targetUser) { $targetUser.id } else { $req.requestedFor }
+            approverId = $targetApproverId
             fields = $req.fields
         } | ConvertTo-Json
 

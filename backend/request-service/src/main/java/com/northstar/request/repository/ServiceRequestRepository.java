@@ -62,6 +62,15 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequestEn
     Page<ServiceRequestEntity> findByServiceNameNotOrRequesterIdOrRequestedForIdOrApproverIdOrderByCreatedAtDesc(String serviceName, String requesterId, String requestedForId, String approverId, Pageable pageable);
 
     /**
+     * Finds requests for employees in a reporting hierarchy or where the actor is designated approver.
+     */
+    Page<ServiceRequestEntity> findByRequesterIdInOrRequestedForIdInOrApproverIdOrderByCreatedAtDesc(
+            java.util.Collection<String> requesterIds,
+            java.util.Collection<String> requestedForIds,
+            String approverId,
+            Pageable pageable);
+
+    /**
      * Direct query updating the status of a service request.
      *
      * @param id Request UUID.
@@ -72,4 +81,10 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequestEn
     @Transactional
     @Query("update ServiceRequestEntity r set r.status = :status where r.id = :id")
     int updateStatus(@Param("id") UUID id, @Param("status") RequestStatus status);
+
+    /**
+     * Finds requests containing a specific snippet within their serialized fieldsJson.
+     */
+    @Query("select r from ServiceRequestEntity r where r.fieldsJson like %:pattern%")
+    java.util.List<ServiceRequestEntity> findByFieldsJsonContaining(@Param("pattern") String pattern);
 }

@@ -3,9 +3,11 @@ package com.northstar.auth.controller;
 import com.northstar.auth.dto.AuthModels.AuthenticatedUser;
 import com.northstar.auth.dto.AuthModels.ApproverOption;
 import com.northstar.auth.dto.AuthModels.LoginInput;
+import com.northstar.auth.dto.AuthModels.ManagerOption;
 import com.northstar.auth.dto.AuthModels.PasswordChange;
 import com.northstar.auth.dto.AuthModels.RegisterInput;
 import com.northstar.auth.dto.AuthModels.RegistrationResponse;
+import com.northstar.auth.dto.AuthModels.SubordinateSummary;
 import com.northstar.auth.dto.AuthModels.TokenResponse;
 import com.northstar.auth.service.AuthService;
 import jakarta.validation.Valid;
@@ -98,6 +100,33 @@ public class AuthController {
      */
     @GetMapping("/approvers")
     public List<ApproverOption> approvers() { return auth.listApprovers(); }
+
+    /**
+     * Lists active manager and administrator users available to be assigned as personal managers.
+     *
+     * <p><b>Purpose:</b> Supplies manager options for user administration and personal manager assignment.
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link AuthService#listManagers()}.
+     *
+     * @return List of ManagerOption DTOs.
+     */
+    @GetMapping("/managers")
+    public List<ManagerOption> managers() { return auth.listManagers(); }
+
+    /**
+     * Retrieves the reporting hierarchy of subordinates for the authenticated manager.
+     *
+     * <p><b>Purpose:</b> Provides direct and indirect subordinates for scoping approval permissions.
+     *
+     * <p><b>Downstream / Workflow:</b> Calls {@link AuthService#getReportingHierarchy(UUID)}.
+     *
+     * @param jwt Authenticated caller JWT principal.
+     * @return List of SubordinateSummary DTOs.
+     */
+    @GetMapping("/hierarchy/subordinates")
+    public List<SubordinateSummary> mySubordinates(@AuthenticationPrincipal Jwt jwt) {
+        return auth.getReportingHierarchy(UUID.fromString(jwt.getSubject()));
+    }
 
     /**
      * Updates the password of the currently authenticated user.

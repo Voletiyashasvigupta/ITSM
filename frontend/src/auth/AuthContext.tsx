@@ -5,7 +5,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
  * - `EMPLOYEE`: Standard portal user access (self-service catalog, own tickets).
  * - `MANAGER_ADMIN`: Combined manager and administrator access (approvals, user administration, global queues).
  */
-export type PortalRole = 'EMPLOYEE' | 'MANAGER_ADMIN'
+export type PortalRole = 'EMPLOYEE' | 'MANAGER' | 'MANAGER_ADMIN'
+
+export type OrganizationalGroup = 'GENERAL' | 'CORPORATE' | 'COMPANY_INFRASTRUCTURE'
+
+export const ORGANIZATIONAL_GROUP_LABELS: Record<OrganizationalGroup, string> = {
+  GENERAL: 'General',
+  CORPORATE: 'Corporate',
+  COMPANY_INFRASTRUCTURE: 'Company Infrastructure',
+}
 
 /**
  * Organizational departments for employees within Northstar Bank.
@@ -34,6 +42,9 @@ export type PortalUser = {
   email: string
   role: PortalRole
   department?: EmployeeDepartment | null
+  orgGroup?: OrganizationalGroup | null
+  managerId?: string | null
+  managerName?: string | null
   roles: PortalRole[]
   active?: boolean
 }

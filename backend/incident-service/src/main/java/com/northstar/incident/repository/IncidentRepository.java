@@ -34,4 +34,9 @@ public interface IncidentRepository extends JpaRepository<IncidentEntity, UUID> 
      * @return List of all incidents.
      */
     List<IncidentEntity> findAllByOrderByCreatedAtDesc();
+
+    /**
+     * Finds all incidents by synchronization status (e.g. PENDING_RETRY).
+     */
+    List<IncidentEntity> findBySyncStatus(String syncStatus);
 }

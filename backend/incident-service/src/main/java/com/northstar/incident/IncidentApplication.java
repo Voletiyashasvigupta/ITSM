@@ -2,6 +2,7 @@ package com.northstar.incident;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Main application entry point for the Northstar Incident Management microservice.
@@ -13,6 +14,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * as {@code INCIDENT-SERVICE}, and exposes REST endpoints under {@code /api/incidents/**}.
  */
 @SpringBootApplication
+@EnableScheduling
 public class IncidentApplication {
 
     /**

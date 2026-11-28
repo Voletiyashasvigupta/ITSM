@@ -1,5 +1,6 @@
 package com.northstar.request.service;
 
+import com.northstar.request.client.AuthServiceClient;
 import com.northstar.request.entity.ApprovalEntity;
 import com.northstar.request.entity.RequestHistoryEntity;
 import com.northstar.request.entity.RequestStatus;
@@ -10,72 +11,46 @@ import com.northstar.request.repository.ApprovalRepository;
 import com.northstar.request.repository.RequestHistoryRepository;
 import com.northstar.request.repository.ServiceRequestRepository;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Service interface governing request approval workflows.
- *
- * <p><b>Purpose:</b> Declares contract for listing pending approvals, querying decision history,
- * inspecting single approval details, and applying approve/reject decisions with mandatory comment validation.
- *
- * <p><b>Downstream / Workflow:</b> Injected into {@link com.northstar.request.controller.ApprovalsController}.
+ * Service interface governing request approval workflows with reporting hierarchy enforcement.
  */
 public interface LocalApprovalService {
 
     /**
-     * Lists requests currently awaiting the actor's decision.
-     *
-     * @param actor Approver subject ID.
-     * @param manager Whether actor is a manager.
-     * @return List of pending ApprovalResponse DTOs.
+     * Lists requests currently awaiting the actor's decision or within their reporting hierarchy.
      */
-    java.util.List<ApprovalResponse> pending(String actor, boolean manager);
+    List<ApprovalResponse> pending(String actor, boolean isAdmin, boolean isManager);
 
     /**
-     * Lists historical approval decisions decided by the actor.
-     *
-     * @param actor Approver subject ID.
-     * @param manager Whether actor is a manager.
-     * @return List of historical ApprovalResponse DTOs.
+     * Lists historical approval decisions decided by the actor or their hierarchy.
      */
-    java.util.List<ApprovalResponse> history(String actor, boolean manager);
+    List<ApprovalResponse> history(String actor, boolean isAdmin, boolean isManager);
 
     /**
      * Retrieves a single approval record by ID.
-     *
-     * @param id Approval UUID.
-     * @param actor User subject ID.
-     * @param manager Whether actor is manager.
-     * @return ApprovalResponse.
      */
-    ApprovalResponse get(UUID id, String actor, boolean manager);
+    ApprovalResponse get(UUID id, String actor, boolean isAdmin, boolean isManager);
 
     /**
-     * Records an approval or rejection decision.
-     *
-     * <p><b>Purpose:</b> Validates that the actor matches the designated approver, that the approval is still PENDING,
-     * enforces a non-empty comment on rejection, updates the approval row, transitions the request status in {@link RequestStateMachine},
-     * and writes a {@link RequestHistoryEntity} audit entry.
-     *
-     * @param id Approval UUID.
-     * @param actor Approver subject ID.
-     * @param approve {@code true} to approve; {@code false} to reject.
-     * @param comment Reason comment (mandatory on rejection).
-     * @return Updated ApprovalResponse.
+     * Records an approval or rejection decision, strictly enforcing manager hierarchy permissions.
      */
-    ApprovalResponse decide(UUID id, String actor, boolean approve, String comment);
+    ApprovalResponse decide(UUID id, String actor, boolean isAdmin, boolean approve, String comment);
 }
 
 /**
  * Default implementation of {@link LocalApprovalService}.
- *
- * <p><b>Purpose:</b> Coordinates {@link ApprovalRepository}, {@link ServiceRequestRepository}, and {@link RequestHistoryRepository}.
  */
 @Service
 class LocalApprovalServiceImpl implements LocalApprovalService {
@@ -84,49 +59,98 @@ class LocalApprovalServiceImpl implements LocalApprovalService {
     private final RequestHistoryRepository history;
     private final RequestStateMachine stateMachine;
     private final ServiceNowRequestClient serviceNowClient;
+    private final AuthServiceClient authClient;
 
-    LocalApprovalServiceImpl(ApprovalRepository a, ServiceRequestRepository r, RequestHistoryRepository h, RequestStateMachine stateMachine, ServiceNowRequestClient serviceNowClient) {
+    LocalApprovalServiceImpl(ApprovalRepository a, ServiceRequestRepository r, RequestHistoryRepository h,
+                             RequestStateMachine stateMachine, ServiceNowRequestClient serviceNowClient,
+                             AuthServiceClient authClient) {
         this.approvals = a;
         this.requests = r;
         this.history = h;
         this.stateMachine = stateMachine;
         this.serviceNowClient = serviceNowClient;
+        this.authClient = authClient;
     }
 
     @Override
-    public java.util.List<ApprovalResponse> pending(String actor, boolean manager) {
-        return list(actor, manager, true);
+    public List<ApprovalResponse> pending(String actor, boolean isAdmin, boolean isManager) {
+        if (isAdmin) {
+            return approvals.findByDecisionOrderByCreatedAtDesc("PENDING").stream()
+                    .map(this::view).toList();
+        }
+        if (isManager) {
+            List<ApprovalEntity> directlyAssigned = approvals.findByApproverIdAndDecisionOrderByCreatedAtDesc(actor, "PENDING");
+            Set<UUID> seenApprovalIds = directlyAssigned.stream().map(ApprovalEntity::getId).collect(Collectors.toSet());
+            List<ApprovalEntity> allScoped = new ArrayList<>(directlyAssigned);
+
+            List<String> subordinateIds = authClient.getSubordinateIds(actor);
+            if (!subordinateIds.isEmpty()) {
+                List<ApprovalEntity> pendingAcrossOrg = approvals.findByDecisionOrderByCreatedAtDesc("PENDING");
+                for (ApprovalEntity app : pendingAcrossOrg) {
+                    if (!seenApprovalIds.contains(app.getId())) {
+                        requests.findById(app.getRequestId()).ifPresent(req -> {
+                            if (subordinateIds.contains(req.getRequestedForId()) || subordinateIds.contains(req.getRequesterId())) {
+                                seenApprovalIds.add(app.getId());
+                                allScoped.add(app);
+                            }
+                        });
+                    }
+                }
+            }
+            return allScoped.stream().map(this::view).toList();
+        }
+        return approvals.findByApproverIdAndDecisionOrderByCreatedAtDesc(actor, "PENDING").stream()
+                .map(this::view).toList();
     }
 
     @Override
-    public java.util.List<ApprovalResponse> history(String actor, boolean manager) {
-        return list(actor, manager, false);
+    public List<ApprovalResponse> history(String actor, boolean isAdmin, boolean isManager) {
+        if (isAdmin) {
+            return approvals.findAll().stream()
+                    .filter(a -> !"PENDING".equals(a.getDecision()))
+                    .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                    .map(this::view).toList();
+        }
+        return approvals.findByApproverIdOrderByCreatedAtDesc(actor).stream()
+                .filter(a -> !"PENDING".equals(a.getDecision()))
+                .map(this::view).toList();
     }
 
     @Override
-    public ApprovalResponse get(UUID id, String actor, boolean manager) {
+    public ApprovalResponse get(UUID id, String actor, boolean isAdmin, boolean isManager) {
         ApprovalEntity a = approvals.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Approval not found"));
         ServiceRequestEntity r = requests.findById(a.getRequestId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found"));
         boolean participant = a.getApproverId().equals(actor) || r.getRequesterId().equals(actor) || r.getRequestedForId().equals(actor);
-        if (!manager && !participant) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to approval record");
-        return view(a);
-    }
-
-    private java.util.List<ApprovalResponse> list(String actor, boolean manager, boolean pending) {
-        var rows = pending
-                ? approvals.findByApproverIdAndDecisionOrderByCreatedAtDesc(actor, "PENDING")
-                : approvals.findByApproverIdOrderByCreatedAtDesc(actor);
-        return rows.stream().filter(a -> !pending || a.getDecision().equals("PENDING")).map(this::view).toList();
+        if (participant || isAdmin) return view(a);
+        if (isManager && (authClient.isSubordinate(actor, r.getRequestedForId()) || authClient.isSubordinate(actor, r.getRequesterId()))) {
+            return view(a);
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to approval record");
     }
 
     @Override
     @Transactional
-    public ApprovalResponse decide(UUID id, String actor, boolean approve, String comment) {
+    public ApprovalResponse decide(UUID id, String actor, boolean isAdmin, boolean approve, String comment) {
         ApprovalEntity a = approvals.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Approval not found"));
-        if (!a.getApproverId().equals(actor)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the assigned approver can decide");
-        if (!"PENDING".equals(a.getDecision())) throw new ResponseStatusException(HttpStatus.CONFLICT, "Approval has already been decided");
-        if (!approve && (comment == null || comment.isBlank())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A comment is required when rejecting");
         ServiceRequestEntity r = requests.findById(a.getRequestId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found"));
+
+        // Strictly enforce reporting hierarchy: Manager can only approve requests for employees within their assigned reporting hierarchy
+        boolean authorized = isAdmin
+                || a.getApproverId().equals(actor)
+                || authClient.isSubordinate(actor, r.getRequestedForId())
+                || authClient.isSubordinate(actor, r.getRequesterId());
+
+        if (!authorized) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Manager can only approve requests for employees within their assigned reporting hierarchy");
+        }
+
+        if (!"PENDING".equals(a.getDecision())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Approval has already been decided");
+        }
+        if (!approve && (comment == null || comment.isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A comment is required when rejecting");
+        }
+
         RequestStatus target = approve ? RequestStatus.APPROVED : RequestStatus.REJECTED;
         RequestStatus from = r.getStatus();
         stateMachine.require(from, target);

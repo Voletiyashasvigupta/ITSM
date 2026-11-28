@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
@@ -20,14 +21,13 @@ public interface ServiceNowCatalogClient {
 
     /**
      * Retrieves catalog items from the ServiceNow integration boundary.
-     *
-     * <p><b>Purpose:</b> Issues an internal HTTP GET to {@code /integration/catalog?limit={limit}} via Eureka service discovery.
-     *
-     * <p><b>Downstream / Workflow:</b> Dispatched to {@code CatalogProxyController} in the ServiceNow integration service.
-     *
-     * @param limit Maximum number of records to retrieve.
-     * @return JsonNode containing catalog data.
      */
     @GetMapping("/catalog")
     List<Map<String, Object>> list(@RequestParam("limit") int limit);
+
+    /**
+     * Retrieves detailed metadata and variables for a specific catalog item.
+     */
+    @GetMapping("/catalog/items/{sysId}")
+    Map<String, Object> getItemDetails(@PathVariable("sysId") String sysId);
 }

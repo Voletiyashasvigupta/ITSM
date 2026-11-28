@@ -49,6 +49,18 @@ public class IntegrationStatusController {
     }
 
     /**
+     * Retrieves the single documented, configurable status and field mapping specification.
+     *
+     * <p><b>Purpose:</b> Exposes portal-to-ServiceNow mappings for requests, RITMs, incidents, and approvals.
+     *
+     * @return Map containing full mapping specification.
+     */
+    @GetMapping("/mapping")
+    public java.util.Map<String, Object> mapping() {
+        return com.northstar.integration.mapping.ServiceNowStatusMapping.exportFullMappingSpecification();
+    }
+
+    /**
      * Response record encapsulating the integration configuration health check.
      *
      * <p><b>Purpose:</b> DTO returned to status clients.

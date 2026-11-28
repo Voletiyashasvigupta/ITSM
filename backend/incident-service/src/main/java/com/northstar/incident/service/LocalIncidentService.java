@@ -7,8 +7,10 @@ import com.northstar.incident.dto.IncidentStatusInput;
 import com.northstar.incident.entity.IncidentCommentEntity;
 import com.northstar.incident.entity.IncidentEntity;
 import com.northstar.incident.integration.ServiceNowIncidentClient;
+import com.northstar.incident.integration.ServiceNowIncidentMapper;
 import com.northstar.incident.repository.IncidentCommentRepository;
 import com.northstar.incident.repository.IncidentRepository;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +70,16 @@ public interface LocalIncidentService {
     IncidentDetailResponse detail(UUID id, String actor, boolean support);
 
     /**
+     * Synchronizes incident state and attributes with live ServiceNow outcomes.
+     */
+    IncidentDetailResponse sync(UUID id, String actor, boolean support);
+
+    /**
+     * Retries ServiceNow submission or synchronization following an outage or failure.
+     */
+    IncidentDetailResponse retry(UUID id, String actor, boolean support);
+
+    /**
      * Updates incident state, status, or assignee.
      *
      * <p><b>Purpose:</b> Support triage and status modification.
@@ -121,12 +133,20 @@ class LocalIncidentServiceImpl implements LocalIncidentService {
     private final IncidentRepository incidents;
     private final IncidentCommentRepository comments;
     private final ServiceNowIncidentClient serviceNowClient;
+    private final ServiceNowIncidentMapper statusMapper;
 
     LocalIncidentServiceImpl(IncidentRepository incidents, IncidentCommentRepository comments,
                              ServiceNowIncidentClient serviceNowClient) {
+        this(incidents, comments, serviceNowClient, new ServiceNowIncidentMapper());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    LocalIncidentServiceImpl(IncidentRepository incidents, IncidentCommentRepository comments,
+                             ServiceNowIncidentClient serviceNowClient, ServiceNowIncidentMapper statusMapper) {
         this.incidents = incidents;
         this.comments = comments;
         this.serviceNowClient = serviceNowClient;
+        this.statusMapper = statusMapper != null ? statusMapper : new ServiceNowIncidentMapper();
     }
 
     @Override
@@ -149,27 +169,37 @@ class LocalIncidentServiceImpl implements LocalIncidentService {
         String caller = (input.caller() != null && !input.caller().isBlank()) ? input.caller().trim() : actor;
         String shortDesc = input.effectiveShortDescription();
         String desc = (input.description() != null) ? input.description().trim() : "";
+        String correlationId = UUID.randomUUID().toString();
 
         // Attempt live synchronization with external ServiceNow Cloud instance
         String externalId = null;
         String externalSystem = "local";
+        String syncStatus = "SYNCED";
+        String syncError = null;
+        boolean outage = false;
+
         try {
             Map<String, Object> snPayload = new HashMap<>();
             snPayload.put("short_description", shortDesc);
             snPayload.put("description", desc);
             snPayload.put("category", input.category() != null ? input.category() : "Software");
-            snPayload.put("impact", mapPriorityLevelToServiceNow(impact));
-            snPayload.put("urgency", mapPriorityLevelToServiceNow(urgency));
+            snPayload.put("impact", statusMapper.mapSeverityToServiceNow(impact));
+            snPayload.put("urgency", statusMapper.mapSeverityToServiceNow(urgency));
             snPayload.put("caller_id", caller);
+            snPayload.put("correlation_id", correlationId);
 
             Map<String, Object> snResponse = serviceNowClient.createIncident(snPayload);
             if (snResponse != null && snResponse.get("number") != null) {
                 num = String.valueOf(snResponse.get("number"));
                 externalId = String.valueOf(snResponse.get("sys_id"));
                 externalSystem = "servicenow";
+            } else {
+                throw new IllegalStateException("ServiceNow returned empty response");
             }
-        } catch (Exception ignored) {
-            // Graceful fallback: local number and local persistence if ServiceNow is temporarily offline
+        } catch (Exception ex) {
+            outage = true;
+            syncStatus = "PENDING_RETRY";
+            syncError = "ServiceNow unreachable: " + (ex.getMessage() != null ? ex.getMessage() : ex.toString());
         }
 
         IncidentEntity incident = new IncidentEntity(
@@ -190,8 +220,22 @@ class LocalIncidentServiceImpl implements LocalIncidentService {
                 actor
         );
         incident.setExternalLink(externalId, externalSystem);
+        incident.setCorrelationId(correlationId);
+        incident.setAssignmentGroup(ServiceNowIncidentMapper.DEFAULT_ASSIGNMENT_GROUP);
+        incident.setSyncStatus(syncStatus);
+        incident.setSyncError(syncError);
+        if (outage) {
+            incident.setSyncAttempts(1);
+            incident.setNextSyncAttemptAt(Instant.now().plusSeconds(10));
+        }
 
-        return view(incidents.save(incident));
+        IncidentEntity saved = incidents.save(incident);
+        if (outage) {
+            comments.save(new IncidentCommentEntity(saved.getId(), "system",
+                    "ServiceNow unreachable during submission (" + syncError + "). Record preserved locally and queued for background retry."));
+        }
+
+        return view(saved);
     }
 
     private static String mapPriorityLevelToServiceNow(String val) {
@@ -213,7 +257,130 @@ class LocalIncidentServiceImpl implements LocalIncidentService {
     public IncidentDetailResponse detail(UUID id, String actor, boolean support) {
         IncidentEntity incident = find(id);
         assertAccess(incident, actor, support);
+        if ("servicenow".equalsIgnoreCase(incident.getExternalSystem()) && incident.getExternalId() != null && !incident.getExternalId().isBlank()) {
+            try {
+                return sync(id, actor, support);
+            } catch (Exception ignored) {}
+        }
         return new IncidentDetailResponse(view(incident), comments.findByIncidentIdOrderByCreatedAtAsc(id));
+    }
+
+    @Override
+    @Transactional
+    public IncidentDetailResponse sync(UUID id, String actor, boolean support) {
+        IncidentEntity incident = find(id);
+        assertAccess(incident, actor, support);
+        if ("servicenow".equalsIgnoreCase(incident.getExternalSystem()) && incident.getExternalId() != null && !incident.getExternalId().isBlank()) {
+            try {
+                Map<String, Object> snData = serviceNowClient.getIncident(incident.getExternalId());
+                if (snData != null) {
+                    String snState = snData.get("incident_state") != null ? String.valueOf(snData.get("incident_state")).trim()
+                            : (snData.get("state") != null ? String.valueOf(snData.get("state")).trim() : "");
+                    String snPriority = snData.get("priority") != null ? String.valueOf(snData.get("priority")).trim() : "";
+
+                    if (snData.get("assignment_group") != null) {
+                        Object grp = snData.get("assignment_group");
+                        String grpStr = grp instanceof Map<?, ?> m ? String.valueOf(m.get("display_value") != null ? m.get("display_value") : m.get("value")) : String.valueOf(grp);
+                        if (!grpStr.isBlank() && !"null".equalsIgnoreCase(grpStr)) incident.setAssignmentGroup(grpStr);
+                    }
+                    if (snData.get("assigned_to") != null) {
+                        Object usr = snData.get("assigned_to");
+                        String usrStr = usr instanceof Map<?, ?> m ? String.valueOf(m.get("display_value") != null ? m.get("display_value") : m.get("value")) : String.valueOf(usr);
+                        if (!usrStr.isBlank() && !"null".equalsIgnoreCase(usrStr)) incident.addAssignee(usrStr);
+                    }
+
+                    String mappedState = statusMapper.mapServiceNowStateToLocal(snState);
+                    if (mappedState != null && !mappedState.equalsIgnoreCase(incident.getState())) {
+                        String oldState = incident.getState();
+                        incident.updateState(mappedState);
+                        comments.save(new IncidentCommentEntity(id, "servicenow",
+                                "Synced state from ServiceNow: " + oldState + " -> " + mappedState + " (priority: " + snPriority + ")"));
+                    }
+                    incidents.save(incident);
+                }
+            } catch (Exception ignored) {}
+        }
+        return new IncidentDetailResponse(view(incident), comments.findByIncidentIdOrderByCreatedAtAsc(id));
+    }
+
+    @Override
+    @Transactional
+    public IncidentDetailResponse retry(UUID id, String actor, boolean support) {
+        IncidentEntity incident = find(id);
+        assertAccess(incident, actor, support);
+
+        if ("servicenow".equalsIgnoreCase(incident.getExternalSystem()) && incident.getExternalId() != null && !incident.getExternalId().isBlank()) {
+            return sync(id, actor, support);
+        }
+
+        try {
+            Map<String, Object> snPayload = new HashMap<>();
+            snPayload.put("short_description", incident.getShortDescription());
+            snPayload.put("description", incident.getDescription());
+            snPayload.put("category", incident.getCategory() != null ? incident.getCategory() : "Software");
+            snPayload.put("impact", statusMapper.mapSeverityToServiceNow(incident.getImpact()));
+            snPayload.put("urgency", statusMapper.mapSeverityToServiceNow(incident.getUrgency()));
+            snPayload.put("caller_id", incident.getCaller());
+            if (incident.getCorrelationId() != null) {
+                snPayload.put("correlation_id", incident.getCorrelationId());
+            }
+            if (incident.getAssignmentGroup() != null && !incident.getAssignmentGroup().isBlank()) {
+                snPayload.put("assignment_group", incident.getAssignmentGroup());
+            }
+
+            Map<String, Object> snResponse = serviceNowClient.createIncident(snPayload);
+            if (snResponse != null && snResponse.get("number") != null) {
+                String num = String.valueOf(snResponse.get("number"));
+                String externalId = String.valueOf(snResponse.get("sys_id"));
+                incident.setIncidentNumber(num);
+                incident.setExternalLink(externalId, "servicenow");
+                incident.setSyncStatus("SYNCED");
+                incident.setSyncError(null);
+                incident.setNextSyncAttemptAt(null);
+                incidents.save(incident);
+
+                comments.save(new IncidentCommentEntity(id, actor,
+                        "Manual retry succeeded. Linked to ServiceNow incident " + num));
+            } else {
+                throw new IllegalStateException("ServiceNow returned empty response");
+            }
+        } catch (Exception ex) {
+            int attempts = incident.getSyncAttempts() != null ? incident.getSyncAttempts() + 1 : 1;
+            incident.setSyncAttempts(attempts);
+            incident.setSyncStatus(attempts >= 5 ? "FAILED" : "PENDING_RETRY");
+            incident.setSyncError(ex.getMessage() != null ? ex.getMessage() : ex.toString());
+            incidents.save(incident);
+
+            comments.save(new IncidentCommentEntity(id, actor,
+                    "Manual retry failed: " + ex.getMessage()));
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "ServiceNow incident retry failed: " + ex.getMessage());
+        }
+        return new IncidentDetailResponse(view(incident), comments.findByIncidentIdOrderByCreatedAtAsc(id));
+    }
+
+    private static String mapServiceNowStateToLocal(String snState) {
+        if (snState == null || snState.isBlank()) return null;
+        return switch (snState) {
+            case "1" -> "New";
+            case "2" -> "In Progress";
+            case "3" -> "On Hold";
+            case "6" -> "Resolved";
+            case "7" -> "Closed";
+            case "8" -> "Canceled";
+            default -> null;
+        };
+    }
+
+    private static String mapLocalStateToServiceNow(String localState) {
+        if (localState == null) return "1";
+        return switch (localState.toLowerCase()) {
+            case "in progress" -> "2";
+            case "on hold" -> "3";
+            case "resolved" -> "6";
+            case "closed" -> "7";
+            case "canceled", "cancelled" -> "8";
+            default -> "1";
+        };
     }
 
     @Override
@@ -232,6 +399,20 @@ class LocalIncidentServiceImpl implements LocalIncidentService {
         String targetAssignee = input.assignedTo() != null ? input.assignedTo() : input.assigneeId();
         if (targetAssignee != null) {
             incident.addAssignee(targetAssignee.isBlank() ? null : targetAssignee.trim());
+        }
+
+        // Propagate state update to ServiceNow Cloud instance
+        if ("servicenow".equalsIgnoreCase(incident.getExternalSystem()) && incident.getExternalId() != null && !incident.getExternalId().isBlank()) {
+            try {
+                Map<String, Object> snUpdate = new HashMap<>();
+                if (newState != null && !newState.isBlank()) {
+                    String mappedSnState = mapLocalStateToServiceNow(newState);
+                    snUpdate.put("incident_state", mappedSnState);
+                    snUpdate.put("state", mappedSnState);
+                }
+                snUpdate.put("work_notes", "Status updated to " + incident.getState() + " by " + actor + " in Service Hub");
+                serviceNowClient.updateIncident(incident.getExternalId(), snUpdate);
+            } catch (Exception ignored) {}
         }
 
         return view(incident);
@@ -304,8 +485,13 @@ class LocalIncidentServiceImpl implements LocalIncidentService {
                 incident.getStatus(),
                 incident.getReporterId(),
                 incident.getAssigneeId(),
+                incident.getExternalId(),
+                incident.getExternalSystem(),
                 incident.getCreatedAt(),
-                incident.getUpdatedAt()
+                incident.getUpdatedAt(),
+                incident.getAssignmentGroup(),
+                incident.getSyncStatus() != null ? incident.getSyncStatus() : "SYNCED",
+                incident.getSyncError()
         );
     }
 }

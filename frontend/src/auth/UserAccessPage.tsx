@@ -16,7 +16,12 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { useAuth, type EmployeeDepartment, type PortalRole } from './AuthContext'
+import {
+  useAuth,
+  type EmployeeDepartment,
+  type OrganizationalGroup,
+  type PortalRole,
+} from './AuthContext'
 
 /**
  * Summary record representing an employee user account in the portal.
@@ -29,8 +34,22 @@ type UserSummary = {
   email: string
   role: PortalRole | null
   department: EmployeeDepartment | null
+  orgGroup?: OrganizationalGroup | null
+  managerId?: string | null
+  managerName?: string | null
   active: boolean
   createdAt: string
+}
+
+type ManagerOption = {
+  id: string
+  employeeId?: string
+  username: string
+  fullName: string
+  email: string
+  role: PortalRole
+  department?: EmployeeDepartment | null
+  orgGroup?: OrganizationalGroup | null
 }
 
 /** Pre-defined department list with display labels. */
@@ -48,6 +67,13 @@ const departments: Array<{ value: EmployeeDepartment; label: string }> = [
   { value: 'OTHER', label: 'Other' },
 ]
 
+/** Supported organizational groups. */
+const orgGroups: Array<{ value: OrganizationalGroup; label: string }> = [
+  { value: 'GENERAL', label: 'General' },
+  { value: 'CORPORATE', label: 'Corporate' },
+  { value: 'COMPANY_INFRASTRUCTURE', label: 'Company Infrastructure' },
+]
+
 const createUserDefaults = () => ({
   fullName: '',
   username: '',
@@ -56,20 +82,26 @@ const createUserDefaults = () => ({
   temporaryPassword: '',
   role: 'EMPLOYEE' as PortalRole,
   department: '' as EmployeeDepartment | '',
+  orgGroup: 'GENERAL' as OrganizationalGroup,
+  managerId: '',
 })
 
 /**
  * Administrative User Access Management Page.
  * Allows Manager and Administrator accounts to:
- * - List all registered user accounts (GET /api/auth/admin/users).
- * - Assign portal access roles (`EMPLOYEE`, `MANAGER_ADMIN`) and departments (PUT /api/auth/admin/users/{id}/access).
- * - Provision new user accounts with temporary passwords (POST /api/auth/admin/users).
+ * - List all registered user accounts with their organizational groups and personal managers.
+ * - Assign portal access roles (`EMPLOYEE`, `MANAGER`, `MANAGER_ADMIN`), organizational groups,
+ *   reporting managers, and departments (PUT /api/auth/admin/users/{id}/access).
+ * - Provision new user accounts with temporary passwords.
  */
 export default function UserAccessPage() {
   const { apiFetch } = useAuth()
   const [users, setUsers] = useState<UserSummary[]>([])
+  const [managers, setManagers] = useState<ManagerOption[]>([])
   const [roles, setRoles] = useState<Record<string, PortalRole>>({})
   const [selectedDepartments, setSelectedDepartments] = useState<Record<string, EmployeeDepartment | ''>>({})
+  const [selectedOrgGroups, setSelectedOrgGroups] = useState<Record<string, OrganizationalGroup | ''>>({})
+  const [selectedManagers, setSelectedManagers] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(true)
@@ -79,14 +111,22 @@ export default function UserAccessPage() {
   const [newUser, setNewUser] = useState(createUserDefaults)
 
   /**
-   * Fetches the complete list of registered accounts from the Auth Service.
+   * Fetches registered accounts and eligible managers from the Auth Service.
    */
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await apiFetch('/api/auth/admin/users')
-      if (!response.ok) throw new Error(`Could not load accounts (${response.status})`)
-      setUsers((await response.json()) as UserSummary[])
+      const [usersRes, managersRes] = await Promise.all([
+        apiFetch('/api/auth/admin/users'),
+        apiFetch('/api/auth/managers'),
+      ])
+      if (!usersRes.ok) throw new Error(`Could not load accounts (${usersRes.status})`)
+      const userData = (await usersRes.json()) as UserSummary[]
+      setUsers(userData)
+
+      if (managersRes.ok) {
+        setManagers((await managersRes.json()) as ManagerOption[])
+      }
       setError('')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not load accounts')
@@ -100,12 +140,14 @@ export default function UserAccessPage() {
   }, [load])
 
   /**
-   * Saves updated role and department assignments for a specific user account.
+   * Saves updated role, department, organizational group, and personal manager assignments.
    */
   async function assign(userId: string) {
     const account = users.find((item) => item.id === userId)
     const role = roles[userId] ?? account?.role
     const department = selectedDepartments[userId] ?? account?.department ?? ''
+    const orgGroup = selectedOrgGroups[userId] ?? account?.orgGroup ?? 'GENERAL'
+    const managerId = selectedManagers[userId] !== undefined ? selectedManagers[userId] : (account?.managerId ?? '')
     if (!role || (role === 'EMPLOYEE' && !department)) return
     setSaving(userId)
     setError('')
@@ -113,11 +155,19 @@ export default function UserAccessPage() {
     try {
       const response = await apiFetch(`/api/auth/admin/users/${userId}/access`, {
         method: 'PUT',
-        body: JSON.stringify({ role, department: department || null }),
+        body: JSON.stringify({
+          role,
+          department: department || null,
+          orgGroup: orgGroup || null,
+          managerId: managerId || null,
+        }),
       })
-      if (!response.ok) throw new Error(`Could not save access (${response.status})`)
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { detail?: string; message?: string }
+        throw new Error(body.detail || body.message || `Could not save access (${response.status})`)
+      }
       await load()
-      setSuccess('User access saved successfully.')
+      setSuccess('User access, organizational group, and manager hierarchy saved successfully.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save access')
     } finally {
@@ -133,7 +183,7 @@ export default function UserAccessPage() {
   )
 
   /**
-   * Provisions a new user account with active status and an initial role/department.
+   * Provisions a new user account with active status and an initial role/department/manager.
    */
   async function createUser() {
     if (!canCreateUser) return
@@ -150,6 +200,8 @@ export default function UserAccessPage() {
           employeeId: newUser.employeeId.trim().toUpperCase() || undefined,
           email: newUser.email.trim(),
           department: newUser.department || null,
+          orgGroup: newUser.orgGroup || null,
+          managerId: newUser.managerId || null,
         }),
       })
       if (!response.ok) {
@@ -161,7 +213,7 @@ export default function UserAccessPage() {
       setAddUserOpen(false)
       await load()
       setSuccess(
-        `${created.fullName} was added with active ${created.role === 'EMPLOYEE' ? 'Employee' : 'Manager + Administrator'} access.`,
+        `${created.fullName} was added with active ${created.role === 'EMPLOYEE' ? 'Employee' : created.role === 'MANAGER' ? 'Manager' : 'Manager + Administrator'} access.`,
       )
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not add user')
@@ -175,9 +227,9 @@ export default function UserAccessPage() {
       <Paper className="content-card" sx={{ p: 3 }}>
         <Box className="section-heading in-card" sx={{ mb: 2 }}>
           <Box>
-            <Typography variant="h6">User access</Typography>
+            <Typography variant="h6">User access & organizational hierarchy</Typography>
             <Typography className="section-note">
-              Assign portal access and the employee’s department or team.
+              Assign portal access, organizational group (General, Corporate, Company Infrastructure), and personal reporting manager.
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -198,17 +250,18 @@ export default function UserAccessPage() {
         </Box>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+
         {loading ? (
           <Typography color="text.secondary">Loading accounts…</Typography>
         ) : users.length === 0 ? (
           <Typography color="text.secondary">No accounts registered yet.</Typography>
         ) : (
           <Box sx={{ overflowX: 'auto' }}>
-            <Box sx={{ minWidth: 1050 }}>
+            <Box sx={{ minWidth: 1250 }}>
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: '1.05fr 1.4fr .9fr 1.3fr 1.65fr .65fr',
+                  gridTemplateColumns: '1.2fr 1.1fr 0.7fr 1fr 1.1fr 1.1fr 1fr 0.6fr',
                   gap: 1.5,
                   py: 1,
                   px: 1,
@@ -220,23 +273,34 @@ export default function UserAccessPage() {
                 <span>Employee</span>
                 <span>Email</span>
                 <span>Status</span>
-                <span>Department / team</span>
-                <span>Portal access</span>
+                <span>Org Group</span>
+                <span>Reporting Manager</span>
+                <span>Department / Team</span>
+                <span>Portal Access</span>
                 <span></span>
               </Box>
               {users.map((account) => {
                 const nextRole = roles[account.id] ?? account.role
                 const nextDepartment = selectedDepartments[account.id] ?? account.department ?? ''
+                const nextOrgGroup = selectedOrgGroups[account.id] ?? account.orgGroup ?? 'GENERAL'
+                const nextManagerId = selectedManagers[account.id] !== undefined ? selectedManagers[account.id] : (account.managerId ?? '')
+
                 const unchanged =
-                  account.active && nextRole === account.role && nextDepartment === (account.department ?? '')
+                  account.active &&
+                  nextRole === account.role &&
+                  nextDepartment === (account.department ?? '') &&
+                  nextOrgGroup === (account.orgGroup ?? 'GENERAL') &&
+                  nextManagerId === (account.managerId ?? '')
+
                 const saveDisabled =
                   saving === account.id || !nextRole || (nextRole === 'EMPLOYEE' && !nextDepartment) || unchanged
+
                 return (
                   <Box
                     key={account.id}
                     sx={{
                       display: 'grid',
-                      gridTemplateColumns: '1.05fr 1.4fr .9fr 1.3fr 1.65fr .65fr',
+                      gridTemplateColumns: '1.2fr 1.1fr 0.7fr 1fr 1.1fr 1.1fr 1fr 0.6fr',
                       gap: 1.5,
                       alignItems: 'center',
                       py: 1.4,
@@ -262,10 +326,58 @@ export default function UserAccessPage() {
                     </Typography>
                     <Chip
                       size="small"
-                      label={account.active ? 'Active' : 'Pending access'}
+                      label={account.active ? 'Active' : 'Pending'}
                       color={account.active ? 'success' : 'warning'}
                       variant="outlined"
                     />
+
+                    {/* Organizational Group */}
+                    <Select
+                      size="small"
+                      value={nextOrgGroup}
+                      onChange={(event) => {
+                        setSuccess('')
+                        setSelectedOrgGroups((current) => ({
+                          ...current,
+                          [account.id]: event.target.value as OrganizationalGroup,
+                        }))
+                      }}
+                      sx={{ minWidth: 135, fontSize: 12 }}
+                    >
+                      {orgGroups.map((g) => (
+                        <MenuItem key={g.value} value={g.value}>
+                          {g.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+
+                    {/* Reporting Manager Dropdown */}
+                    <Select
+                      size="small"
+                      value={nextManagerId}
+                      displayEmpty
+                      onChange={(event) => {
+                        setSuccess('')
+                        setSelectedManagers((current) => ({
+                          ...current,
+                          [account.id]: event.target.value,
+                        }))
+                      }}
+                      sx={{ minWidth: 155, fontSize: 12 }}
+                    >
+                      <MenuItem value="">
+                        <em>(No manager assigned)</em>
+                      </MenuItem>
+                      {managers
+                        .filter((m) => m.id !== account.id) // Cannot assign self as manager
+                        .map((mgr) => (
+                          <MenuItem key={mgr.id} value={mgr.id}>
+                            {mgr.fullName} ({mgr.role === 'MANAGER_ADMIN' ? 'Admin' : 'Manager'})
+                          </MenuItem>
+                        ))}
+                    </Select>
+
+                    {/* Department */}
                     <Select
                       size="small"
                       value={nextDepartment}
@@ -277,7 +389,7 @@ export default function UserAccessPage() {
                           [account.id]: event.target.value as EmployeeDepartment,
                         }))
                       }}
-                      sx={{ minWidth: 175, fontSize: 12 }}
+                      sx={{ minWidth: 155, fontSize: 12 }}
                     >
                       <MenuItem value="" disabled>
                         Select department
@@ -288,6 +400,8 @@ export default function UserAccessPage() {
                         </MenuItem>
                       ))}
                     </Select>
+
+                    {/* Portal Access Role */}
                     <Select
                       size="small"
                       value={nextRole ?? ''}
@@ -299,14 +413,16 @@ export default function UserAccessPage() {
                           [account.id]: event.target.value as PortalRole,
                         }))
                       }}
-                      sx={{ minWidth: 190, fontSize: 12 }}
+                      sx={{ minWidth: 145, fontSize: 12 }}
                     >
                       <MenuItem value="" disabled>
                         Select access
                       </MenuItem>
                       <MenuItem value="EMPLOYEE">Employee</MenuItem>
-                      <MenuItem value="MANAGER_ADMIN">Manager + Administrator</MenuItem>
+                      <MenuItem value="MANAGER">Manager</MenuItem>
+                      <MenuItem value="MANAGER_ADMIN">Manager + Admin</MenuItem>
                     </Select>
+
                     <Button
                       size="small"
                       variant="contained"
@@ -335,7 +451,7 @@ export default function UserAccessPage() {
         <DialogTitle>Add a user</DialogTitle>
         <DialogContent dividers>
           <Typography color="text.secondary" sx={{ fontSize: 12, mb: 2 }}>
-            Create an active account and assign its portal access and department now.
+            Create an active account and configure organizational group, personal manager, and portal access.
           </Typography>
           <TextField
             autoFocus
@@ -382,6 +498,42 @@ export default function UserAccessPage() {
             helperText="Use at least 12 characters. Share it securely; the user can change it in Settings."
             sx={{ mb: 2 }}
           />
+
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel id="new-user-org-group-label">Organizational Group</InputLabel>
+            <Select
+              labelId="new-user-org-group-label"
+              label="Organizational Group"
+              value={newUser.orgGroup}
+              onChange={(event) => setNewUser((current) => ({ ...current, orgGroup: event.target.value as OrganizationalGroup }))}
+            >
+              {orgGroups.map((g) => (
+                <MenuItem key={g.value} value={g.value}>
+                  {g.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel id="new-user-manager-label">Reporting Personal Manager</InputLabel>
+            <Select
+              labelId="new-user-manager-label"
+              label="Reporting Personal Manager"
+              value={newUser.managerId}
+              onChange={(event) => setNewUser((current) => ({ ...current, managerId: event.target.value }))}
+            >
+              <MenuItem value="">
+                <em>(No manager assigned - will route to Admin Queue)</em>
+              </MenuItem>
+              {managers.map((mgr) => (
+                <MenuItem key={mgr.id} value={mgr.id}>
+                  {mgr.fullName} ({mgr.role === 'MANAGER_ADMIN' ? 'Admin' : 'Manager'}) - {mgr.employeeId}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
           <FormControl fullWidth required sx={{ mb: 2 }}>
             <InputLabel id="new-user-access-label">Portal access</InputLabel>
             <Select
@@ -391,9 +543,11 @@ export default function UserAccessPage() {
               onChange={(event) => setNewUser((current) => ({ ...current, role: event.target.value as PortalRole }))}
             >
               <MenuItem value="EMPLOYEE">Employee</MenuItem>
+              <MenuItem value="MANAGER">Manager</MenuItem>
               <MenuItem value="MANAGER_ADMIN">Manager + Administrator</MenuItem>
             </Select>
           </FormControl>
+
           <FormControl fullWidth required={newUser.role === 'EMPLOYEE'}>
             <InputLabel id="new-user-department-label">
               Department / team{newUser.role === 'EMPLOYEE' ? ' *' : ''}

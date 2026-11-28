@@ -2,6 +2,7 @@ package com.northstar.auth.repository;
 
 import com.northstar.auth.entity.PortalUser;
 import com.northstar.auth.entity.PortalRole;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,8 +47,6 @@ public interface PortalUserRepository extends JpaRepository<PortalUser, UUID> {
     /**
      * Finds a user by their unique corporate login username (case-insensitive).
      *
-     * <p><b>Purpose:</b> Primary enterprise lookup for login authentication.
-     *
      * @param username The corporate username.
      * @return Optional containing the user if found.
      */
@@ -64,8 +63,6 @@ public interface PortalUserRepository extends JpaRepository<PortalUser, UUID> {
     /**
      * Finds a user by corporate username or corporate email (case-insensitive).
      *
-     * <p><b>Purpose:</b> Resilient lookup supporting enterprise username login while allowing email resolution.
-     *
      * @param username Corporate username.
      * @param email Corporate email address.
      * @return Optional containing the user if found.
@@ -75,10 +72,6 @@ public interface PortalUserRepository extends JpaRepository<PortalUser, UUID> {
     /**
      * Finds a user by their unique email address.
      *
-     * <p><b>Purpose:</b> Core lookup for login authentication and duplicate checks.
-     *
-     * <p><b>Downstream / Workflow:</b> Called during user authentication and registration workflows.
-     *
      * @param email The email address to search.
      * @return Optional containing the user if found.
      */
@@ -86,10 +79,6 @@ public interface PortalUserRepository extends JpaRepository<PortalUser, UUID> {
 
     /**
      * Checks if a user record with the specified email already exists.
-     *
-     * <p><b>Purpose:</b> Fast uniqueness validation during registration.
-     *
-     * <p><b>Downstream / Workflow:</b> Checked before saving a new user record.
      *
      * @param email The email to check.
      * @return {@code true} if an account exists with this email.
@@ -99,10 +88,6 @@ public interface PortalUserRepository extends JpaRepository<PortalUser, UUID> {
     /**
      * Retrieves all portal users ordered by account creation time ascending.
      *
-     * <p><b>Purpose:</b> Populates the administrator user directory.
-     *
-     * <p><b>Downstream / Workflow:</b> Called by {@code AdminUsersController} to render user management tables.
-     *
      * @return Ordered list of all registered users.
      */
     List<PortalUser> findAllByOrderByCreatedAtAsc();
@@ -110,12 +95,24 @@ public interface PortalUserRepository extends JpaRepository<PortalUser, UUID> {
     /**
      * Finds all active users assigned a specific security role, ordered by full name.
      *
-     * <p><b>Purpose:</b> Looks up active users by role (e.g. eligible approvers or managers).
-     *
-     * <p><b>Downstream / Workflow:</b> Used to populate approver dropdowns and participant selectors.
-     *
      * @param role The security role to filter by.
      * @return List of matching active users.
      */
     List<PortalUser> findAllByRoleAndActiveTrueOrderByFullNameAsc(PortalRole role);
+
+    /**
+     * Finds all active users assigned any of the specified roles, ordered by full name.
+     *
+     * @param roles Collection of security roles.
+     * @return List of matching active users.
+     */
+    List<PortalUser> findAllByRoleInAndActiveTrueOrderByFullNameAsc(Collection<PortalRole> roles);
+
+    /**
+     * Finds all direct reports for a given personal manager.
+     *
+     * @param managerId UUID of the personal manager.
+     * @return List of users directly assigned to this manager.
+     */
+    List<PortalUser> findAllByManagerId(UUID managerId);
 }

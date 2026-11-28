@@ -59,7 +59,7 @@ public class RequestController {
     @GetMapping
     public org.springframework.data.domain.Page<RequestDetailsResponse> list(@AuthenticationPrincipal Jwt jwt,
             @PageableDefault(size = 20, sort = "createdAt", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable) {
-        return requests.list(jwt.getSubject(), isManager(jwt), pageable);
+        return requests.list(jwt.getSubject(), isAdmin(jwt), isManager(jwt), pageable);
     }
 
     /**
@@ -80,7 +80,9 @@ public class RequestController {
      * @return RequestDetailsResponse.
      */
     @GetMapping("/{id}")
-    public RequestDetailsResponse get(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) { return requests.get(id,jwt.getSubject(),isManager(jwt)); }
+    public RequestDetailsResponse get(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return requests.get(id, jwt.getSubject(), isAdmin(jwt), isManager(jwt));
+    }
 
     /**
      * Retrieves chronological audit and status transition timeline for a request.
@@ -90,7 +92,9 @@ public class RequestController {
      * @return List of RequestHistoryResponse events.
      */
     @GetMapping(value = {"/{id}/timeline", "/{id}/history"})
-    public List<RequestHistoryResponse> history(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) { return requests.history(id,jwt.getSubject(),isManager(jwt)); }
+    public List<RequestHistoryResponse> history(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return requests.history(id, jwt.getSubject(), isAdmin(jwt), isManager(jwt));
+    }
 
     /**
      * Cancels an eligible pending request.
@@ -101,7 +105,7 @@ public class RequestController {
      */
     @PostMapping("/{id}/cancel")
     public RequestDetailsResponse cancel(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) {
-        return requests.cancel(id, jwt.getSubject(), isManager(jwt));
+        return requests.cancel(id, jwt.getSubject(), isAdmin(jwt), isManager(jwt));
     }
 
     /**
@@ -119,6 +123,22 @@ public class RequestController {
     }
 
     /**
+     * Synchronizes the request state, approval, and timeline with live ServiceNow outcomes.
+     */
+    @PostMapping("/{id}/sync")
+    public RequestDetailsResponse sync(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return requests.sync(id, jwt.getSubject(), isAdmin(jwt), isManager(jwt));
+    }
+
+    /**
+     * Retries ServiceNow submission or synchronization following an outage or failure.
+     */
+    @PostMapping("/{id}/retry")
+    public RequestDetailsResponse retry(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return requests.retry(id, jwt.getSubject(), isAdmin(jwt), isManager(jwt));
+    }
+
+    /**
      * Accepts and persists an idempotent service catalog request submission.
      *
      * <p><b>Purpose:</b> Implements transactional submission: saves service request row, initial approval row,
@@ -133,7 +153,7 @@ public class RequestController {
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
     public RequestSubmissionResponse submit(
-            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @RequestHeader(value = "X-Authenticated-User", required = false) String gatewayIdentity,
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody RequestSubmission input) {
@@ -141,17 +161,30 @@ public class RequestController {
         List<String> roles = roleClaim instanceof Collection<?> values
                 ? values.stream().filter(String.class::isInstance).map(String.class::cast).toList()
                 : List.of();
-        return submissions.submit(idempotencyKey, jwt.getSubject(), roles, gatewayIdentity, input);
+        String effectiveKey = (idempotencyKey != null && !idempotencyKey.isBlank()) ? idempotencyKey : UUID.randomUUID().toString();
+        return submissions.submit(effectiveKey, jwt.getSubject(), roles, gatewayIdentity, input);
     }
 
     /**
-     * Checks if caller holds the MANAGER_ADMIN authority.
+     * Checks if caller holds the MANAGER_ADMIN authority (global admin).
      *
      * @param jwt Caller JWT.
      * @return {@code true} if manager/admin.
      */
-    static boolean isManager(Jwt jwt) {
-        Object claim=jwt.getClaims().get("roles");
+    public static boolean isAdmin(Jwt jwt) {
+        Object claim = jwt.getClaims().get("roles");
         return claim instanceof Collection<?> values && values.stream().anyMatch("MANAGER_ADMIN"::equals);
+    }
+
+    /**
+     * Checks if caller holds any manager authority (MANAGER or MANAGER_ADMIN).
+     *
+     * @param jwt Caller JWT.
+     * @return {@code true} if manager or admin.
+     */
+    public static boolean isManager(Jwt jwt) {
+        Object claim = jwt.getClaims().get("roles");
+        return claim instanceof Collection<?> values && values.stream()
+                .anyMatch(r -> "MANAGER_ADMIN".equals(r) || "MANAGER".equals(r));
     }
 }

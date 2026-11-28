@@ -64,4 +64,36 @@ public class ServiceNowIncidentClient {
             return null;
         }
     }
+
+    /**
+     * Retrieves an incident from ServiceNow by sys_id.
+     */
+    public Map<String, Object> getIncident(String sysId) {
+        try {
+            return restClient.get()
+                    .uri("/incidents/" + sysId)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+        } catch (Exception ex) {
+            log.warn("ServiceNow incident lookup failed for {}: {}", sysId, ex.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Updates an incident in ServiceNow by sys_id.
+     */
+    public Map<String, Object> updateIncident(String sysId, Map<String, Object> payload) {
+        try {
+            return restClient.patch()
+                    .uri("/incidents/" + sysId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(payload)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+        } catch (Exception ex) {
+            log.warn("ServiceNow incident update failed for {}: {}", sysId, ex.getMessage());
+            return null;
+        }
+    }
 }

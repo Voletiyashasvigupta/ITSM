@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -147,17 +148,253 @@ public class ServiceNowApiClient {
     }
 
     /**
-     * Submits a new incident to the ServiceNow Table API.
+     * Retrieves an existing record from ServiceNow by table and sys_id.
      */
-    public Map<String, Object> createIncident(Map<String, Object> payload) {
-        return createRecord("incident", payload);
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getRecord(String table, String sysId) {
+        requireConfiguration();
+        return circuitBreakers.create("serviceNow").run(
+                () -> {
+                    String authHeader = buildAuthorizationHeader();
+                    Map<String, Object> body = restClient.get()
+                            .uri(properties.baseUrl() + "/api/now/table/" + table + "/" + sysId)
+                            .headers(headers -> headers.set("Authorization", authHeader))
+                            .retrieve()
+                            .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+                    if (body == null || !(body.get("result") instanceof Map<?, ?> result)) {
+                        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "ServiceNow " + table + " record not found");
+                    }
+                    return (Map<String, Object>) result;
+                },
+                failure -> {
+                    log.error("ServiceNow {} read failed for {}: {}", table, sysId, failure.getMessage(), failure);
+                    throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "ServiceNow " + table + " read failed");
+                });
     }
 
     /**
-     * Submits a new service request (requested item) to the ServiceNow Table API.
+     * Retrieves detailed catalog item metadata and variables from Service Catalog API or sc_cat_item table.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getCatalogItemDetails(String sysId) {
+        requireConfiguration();
+        return circuitBreakers.create("serviceNow").run(
+                () -> {
+                    String authHeader = buildAuthorizationHeader();
+                    try {
+                        Map<String, Object> body = restClient.get()
+                                .uri(properties.baseUrl() + "/api/sn_sc/servicecatalog/items/" + sysId)
+                                .headers(headers -> headers.set("Authorization", authHeader))
+                                .retrieve()
+                                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+                        if (body != null && body.get("result") instanceof Map<?, ?> result) {
+                            return (Map<String, Object>) result;
+                        }
+                    } catch (Exception ex) {
+                        log.debug("sn_sc API not available for item {}, falling back to sc_cat_item table: {}", sysId, ex.getMessage());
+                    }
+                    return getRecord("sc_cat_item", sysId);
+                },
+                failure -> {
+                    log.error("ServiceNow catalog item read failed for {}: {}", sysId, failure.getMessage(), failure);
+                    throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "ServiceNow catalog item read failed");
+                });
+    }
+
+    /**
+     * Submits a new incident to the ServiceNow Table API with idempotency and default assignment group.
+     */
+    public Map<String, Object> createIncident(Map<String, Object> payload) {
+        String correlationId = payload.get("correlation_id") != null ? String.valueOf(payload.get("correlation_id")).trim() : null;
+        if (correlationId != null && !correlationId.isBlank()) {
+            Map<String, Object> existing = getRecordByCorrelation("incident", correlationId);
+            if (existing != null) {
+                log.info("Returning existing ServiceNow incident for correlation_id: {}", correlationId);
+                return existing;
+            }
+        }
+        Map<String, Object> incidentPayload = new HashMap<>(payload);
+        if (!incidentPayload.containsKey("assignment_group") || incidentPayload.get("assignment_group") == null) {
+            // Default to Incident Management group (sys_id: 12a586cd0bb23200ecfd818393673a30)
+            incidentPayload.put("assignment_group", "12a586cd0bb23200ecfd818393673a30");
+        }
+        return createRecord("incident", incidentPayload);
+    }
+
+    /**
+     * Queries a ServiceNow table by correlation_id to enforce idempotency across retries.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getRecordByCorrelation(String table, String correlationId) {
+        if (correlationId == null || correlationId.isBlank()) return null;
+        try {
+            String authHeader = buildAuthorizationHeader();
+            Map<String, Object> body = restClient.get()
+                    .uri(properties.baseUrl() + "/api/now/table/" + table + "?sysparm_query=correlation_id=" + correlationId + "&sysparm_limit=1")
+                    .headers(headers -> headers.set("Authorization", authHeader))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+            if (body != null && body.get("result") instanceof List<?> list && !list.isEmpty()) {
+                return (Map<String, Object>) list.get(0);
+            }
+        } catch (Exception ex) {
+            log.debug("Correlation check failed for table {} key {}: {}", table, correlationId, ex.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Looks up an existing ServiceNow user by user_name in sys_user.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getUserByUsername(String username) {
+        if (username == null || username.isBlank()) return null;
+        try {
+            String authHeader = buildAuthorizationHeader();
+            Map<String, Object> body = restClient.get()
+                    .uri(properties.baseUrl() + "/api/now/table/sys_user?sysparm_query=user_name=" + username.trim() + "&sysparm_limit=1")
+                    .headers(headers -> headers.set("Authorization", authHeader))
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+            if (body != null && body.get("result") instanceof List<?> list && !list.isEmpty()) {
+                return (Map<String, Object>) list.get(0);
+            }
+        } catch (Exception ex) {
+            log.debug("User lookup failed for username {}: {}", username, ex.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Submits a full catalog request workflow:
+     * 1. Checks correlation_id to prevent duplicate creation on retry.
+     * 2. Creates a ServiceNow parent catalog request (sc_request) with REQ number.
+     * 3. Creates a ServiceNow catalog request item (sc_req_item) with RITM number linked to the parent request.
+     * 4. Maps submitted answers to catalog variables in sc_item_option and links via sc_item_option_mtom.
      */
     public Map<String, Object> createRequest(Map<String, Object> payload) {
-        return createRecord("sc_req_item", payload);
+        String correlationId = payload.get("correlation_id") != null ? String.valueOf(payload.get("correlation_id")).trim() : null;
+        if (correlationId != null && !correlationId.isBlank()) {
+            Map<String, Object> existingReq = getRecordByCorrelation("sc_request", correlationId);
+            if (existingReq != null) {
+                log.info("Returning existing ServiceNow request for correlation_id: {}", correlationId);
+                Map<String, Object> existingRitm = getRecordByCorrelation("sc_req_item", correlationId);
+                Map<String, Object> combined = new HashMap<>(existingReq);
+                combined.put("request_number", existingReq.get("number"));
+                combined.put("request_sys_id", existingReq.get("sys_id"));
+                if (existingRitm != null) {
+                    combined.put("ritm_number", existingRitm.get("number"));
+                    combined.put("ritm_sys_id", existingRitm.get("sys_id"));
+                }
+                return combined;
+            }
+        }
+
+        Map<String, Object> combined = new HashMap<>();
+        String reqSysId = null;
+        String reqNumber = null;
+
+        // Resolve requested_for to a valid ServiceNow sys_user sys_id
+        String reqFor = null;
+        Object rawReqFor = payload.get("requested_for");
+        if (rawReqFor != null) {
+            String val = String.valueOf(rawReqFor).trim();
+            if (val.length() == 32 && val.matches("[0-9a-fA-F]+")) {
+                reqFor = val;
+            }
+        }
+        if (reqFor == null) {
+            // Default to ServiceNow System Administrator sys_user sys_id
+            reqFor = "6816f79cc0a8016401c5a33be04be441";
+        }
+
+        // Step 1: Create parent sc_request
+        try {
+            Map<String, Object> reqPayload = new HashMap<>();
+            reqPayload.put("short_description", payload.getOrDefault("short_description", "Service Catalog Request"));
+            reqPayload.put("description", payload.getOrDefault("description", ""));
+            reqPayload.put("special_instructions", payload.getOrDefault("special_instructions", ""));
+            reqPayload.put("requested_for", reqFor);
+            if (correlationId != null) {
+                reqPayload.put("correlation_id", correlationId);
+            }
+            Map<String, Object> reqResult = createRecord("sc_request", reqPayload);
+            if (reqResult != null) {
+                reqSysId = reqResult.get("sys_id") != null ? String.valueOf(reqResult.get("sys_id")) : null;
+                reqNumber = reqResult.get("number") != null ? String.valueOf(reqResult.get("number")) : null;
+                combined.put("request_number", reqNumber);
+                combined.put("request_sys_id", reqSysId);
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to create parent sc_request, proceeding with sc_req_item creation: {}", ex.getMessage());
+        }
+
+        // Step 2: Create sc_req_item linked to parent sc_request
+        Map<String, Object> ritmPayload = new HashMap<>(payload);
+        if (reqSysId != null) {
+            ritmPayload.put("request", reqSysId);
+        }
+        ritmPayload.put("requested_for", reqFor);
+        if (correlationId != null) {
+            ritmPayload.put("correlation_id", correlationId);
+        }
+
+        // Ensure cat_item is set to a valid ServiceNow sc_cat_item sys_id so Item and Workflow attach
+        Object rawCatItem = payload.get("cat_item");
+        String catItemSysId = null;
+        if (rawCatItem != null) {
+            String val = String.valueOf(rawCatItem).trim();
+            if (val.length() == 32 && val.matches("[0-9a-fA-F]+")) {
+                catItemSysId = val;
+            }
+        }
+        if (catItemSysId == null) {
+            // Default to Standard Laptop / Hardware Asset catalog item in ServiceNow (has active workflow)
+            catItemSysId = "04b7e94b4f7b4200086eeed18110c7fd";
+        }
+        ritmPayload.put("cat_item", catItemSysId);
+
+        Map<String, Object> ritmResult = createRecord("sc_req_item", ritmPayload);
+        combined.putAll(ritmResult);
+
+        String ritmNumber = ritmResult.get("number") != null ? String.valueOf(ritmResult.get("number")) : null;
+        String ritmSysId = ritmResult.get("sys_id") != null ? String.valueOf(ritmResult.get("sys_id")) : null;
+        combined.put("ritm_number", ritmNumber);
+        combined.put("ritm_sys_id", ritmSysId);
+        if (reqNumber != null) {
+            combined.put("request_number", reqNumber);
+            combined.put("number", reqNumber); // Primary reference is the REQ number
+        } else {
+            combined.put("number", ritmNumber);
+        }
+        if (ritmSysId != null) {
+            combined.put("sys_id", ritmSysId);
+        }
+
+        // Step 3: Create sc_item_option and sc_item_option_mtom for submitted catalog variables
+        Object varsObj = payload.get("variables");
+        if (varsObj instanceof Map<?, ?> vars && ritmSysId != null) {
+            for (Map.Entry<?, ?> entry : vars.entrySet()) {
+                if (entry.getValue() != null && !String.valueOf(entry.getValue()).isBlank()) {
+                    try {
+                        Map<String, Object> opt = new HashMap<>();
+                        opt.put("value", String.valueOf(entry.getValue()).trim());
+                        Map<String, Object> optResult = createRecord("sc_item_option", opt);
+                        if (optResult != null && optResult.get("sys_id") != null) {
+                            String optSysId = String.valueOf(optResult.get("sys_id"));
+                            Map<String, Object> mtom = new HashMap<>();
+                            mtom.put("request_item", ritmSysId);
+                            mtom.put("sc_item_option", optSysId);
+                            createRecord("sc_item_option_mtom", mtom);
+                        }
+                    } catch (Exception ex) {
+                        log.debug("Skipping sc_item_option creation for key {}: {}", entry.getKey(), ex.getMessage());
+                    }
+                }
+            }
+        }
+
+        return combined;
     }
 
     /**

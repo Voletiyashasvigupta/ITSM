@@ -67,6 +67,9 @@ public class ServiceRequestEntity {
     @Column(name = "service_now_number", length = 64)
     private String serviceNowNumber;
 
+    @Column(name = "org_group", length = 60)
+    private String orgGroup;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -129,6 +132,7 @@ public class ServiceRequestEntity {
     public String getRequestedForId() { return requestedForId; }
     public String getApproverId() { return approverId; }
     public String getFieldsJson() { return fieldsJson; }
+    public void setFieldsJson(String fieldsJson) { this.fieldsJson = fieldsJson; }
     public String getExternalId() { return externalId; }
     public String getExternalSystem() { return externalSystem; }
     public void setExternalLink(String externalId, String externalSystem) {
@@ -139,6 +143,8 @@ public class ServiceRequestEntity {
     public void setStatus(RequestStatus status) { this.status = status; }
     public String getServiceNowNumber() { return serviceNowNumber; }
     public void setServiceNowNumber(String serviceNowNumber) { this.serviceNowNumber = serviceNowNumber; }
+    public String getOrgGroup() { return orgGroup; }
+    public void setOrgGroup(String orgGroup) { this.orgGroup = orgGroup; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

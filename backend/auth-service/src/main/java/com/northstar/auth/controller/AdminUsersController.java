@@ -3,6 +3,7 @@ package com.northstar.auth.controller;
 import com.northstar.auth.dto.AuthModels.RoleAssignment;
 import com.northstar.auth.dto.AuthModels.AccessAssignment;
 import com.northstar.auth.dto.AuthModels.AdminUserCreateInput;
+import com.northstar.auth.dto.AuthModels.SubordinateSummary;
 import com.northstar.auth.dto.AuthModels.UserSummary;
 import com.northstar.auth.dto.AuthModels.TokenResponse;
 import com.northstar.auth.service.AuthService;
@@ -62,6 +63,14 @@ public class AdminUsersController {
      */
     @GetMapping
     public List<UserSummary> users() { return auth.listUsers(); }
+
+    /**
+     * Retrieves the reporting hierarchy of subordinates for a specific manager.
+     */
+    @GetMapping("/{id}/subordinates")
+    public List<SubordinateSummary> subordinates(@PathVariable("id") UUID id) {
+        return auth.getReportingHierarchy(id);
+    }
 
     /**
      * Creates an active portal user with predefined role and department.

@@ -128,6 +128,22 @@ public class IncidentsController {
     }
 
     /**
+     * Synchronizes incident state and attributes with live ServiceNow outcomes.
+     */
+    @PostMapping("/{id}/sync")
+    public Object sync(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return incidents.sync(id, jwt.getSubject(), hasSupportRole(jwt));
+    }
+
+    /**
+     * Retries ServiceNow synchronization or submission following an outage or failure.
+     */
+    @PostMapping("/{id}/retry")
+    public Object retry(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return incidents.retry(id, jwt.getSubject(), hasSupportRole(jwt));
+    }
+
+    /**
      * Posts a new comment to an incident.
      *
      * <p><b>Purpose:</b> Communication notes on tickets.

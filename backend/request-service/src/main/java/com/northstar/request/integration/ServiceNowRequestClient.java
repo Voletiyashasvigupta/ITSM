@@ -53,6 +53,21 @@ public class ServiceNowRequestClient {
     }
 
     /**
+     * Retrieves an existing request record from ServiceNow by sys_id.
+     */
+    public Map<String, Object> getRequest(String sysId) {
+        try {
+            return restClient.get()
+                    .uri("/requests/" + sysId)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+        } catch (Exception ex) {
+            log.warn("ServiceNow request lookup failed for {}: {}", sysId, ex.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Updates an existing request in ServiceNow.
      *
      * @param sysId ServiceNow record sys_id.

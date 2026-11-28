@@ -56,6 +56,24 @@ public class IncidentEntity {
     @Column(name = "assigned_to", length = 128)
     private String assignedTo;
 
+    @Column(name = "assignment_group", length = 128)
+    private String assignmentGroup;
+
+    @Column(name = "correlation_id", length = 128)
+    private String correlationId;
+
+    @Column(name = "sync_status", length = 32)
+    private String syncStatus;
+
+    @Column(name = "sync_error", length = 500)
+    private String syncError;
+
+    @Column(name = "sync_attempts")
+    private Integer syncAttempts;
+
+    @Column(name = "next_sync_attempt_at")
+    private Instant nextSyncAttemptAt;
+
     @Column(name = "short_description", length = 255)
     private String shortDescription;
 
@@ -225,6 +243,20 @@ public class IncidentEntity {
     public String getExternalSystem() { return externalSystem; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+
+    public String getAssignmentGroup() { return assignmentGroup; }
+    public String getCorrelationId() { return correlationId; }
+    public String getSyncStatus() { return syncStatus; }
+    public String getSyncError() { return syncError; }
+    public Integer getSyncAttempts() { return syncAttempts; }
+    public Instant getNextSyncAttemptAt() { return nextSyncAttemptAt; }
+
+    public void setAssignmentGroup(String assignmentGroup) { this.assignmentGroup = assignmentGroup; }
+    public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }
+    public void setSyncStatus(String syncStatus) { this.syncStatus = syncStatus; }
+    public void setSyncError(String syncError) { this.syncError = syncError; }
+    public void setSyncAttempts(Integer syncAttempts) { this.syncAttempts = syncAttempts; }
+    public void setNextSyncAttemptAt(Instant nextSyncAttemptAt) { this.nextSyncAttemptAt = nextSyncAttemptAt; }
 
     public void setIncidentNumber(String incidentNumber) { this.incidentNumber = incidentNumber; }
     public void setExternalLink(String externalId, String externalSystem) {

@@ -14,7 +14,7 @@ import java.util.UUID;
  * JPA entity representing a registered portal user within the {@code northstar_auth} database schema.
  *
  * <p><b>Purpose:</b> Persists core identity records, BCrypt password hashes, assigned roles, departments,
- * activation status, and creation timestamps in the {@code portal_users} table.
+ * organizational groups, reporting manager relationships, activation status, and creation timestamps in the {@code portal_users} table.
  *
  * <p><b>Downstream / Workflow:</b> Managed by {@link com.northstar.auth.repository.PortalUserRepository} and queried
  * by {@link com.northstar.auth.service.AuthService} during registration, login, and user management operations.
@@ -47,6 +47,16 @@ public class PortalUser {
     @Enumerated(EnumType.STRING)
     @Column(name = "department", length = 40)
     private EmployeeDepartment department;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "org_group", length = 40)
+    private OrganizationalGroup orgGroup;
+
+    @Column(name = "manager_id")
+    private UUID managerId;
+
+    @Column(name = "manager_name", length = 120)
+    private String managerName;
 
     @Column(nullable = false)
     private boolean active;
@@ -84,10 +94,6 @@ public class PortalUser {
     /**
      * Convenience constructor for instantiating new portal user records.
      *
-     * <p><b>Purpose:</b> Creates a new user entity with a generated UUID, username, credentials, role, and activation flag.
-     *
-     * <p><b>Downstream / Workflow:</b> Called by registration and administrator bootstrap services.
-     *
      * @param username Unique corporate login username.
      * @param fullName User's full name.
      * @param email Corporate email address.
@@ -119,10 +125,6 @@ public class PortalUser {
 
     /**
      * JPA lifecycle callback executed prior to entity insertion.
-     *
-     * <p><b>Purpose:</b> Guarantees a valid UUID, employee ID, username, and creation timestamp are populated before database insert.
-     *
-     * <p><b>Downstream / Workflow:</b> Executed automatically by Hibernate during persistence.
      */
     @PrePersist
     void beforeInsert() {
@@ -156,6 +158,15 @@ public class PortalUser {
     /** @return User's business department. */
     public EmployeeDepartment getDepartment() { return department; }
 
+    /** @return User's organizational group. */
+    public OrganizationalGroup getOrgGroup() { return orgGroup; }
+
+    /** @return Assigned personal manager's UUID. */
+    public UUID getManagerId() { return managerId; }
+
+    /** @return Assigned personal manager's display name. */
+    public String getManagerName() { return managerName; }
+
     /** @return {@code true} if account is active and allowed to authenticate. */
     public boolean isActive() { return active; }
 
@@ -173,6 +184,15 @@ public class PortalUser {
 
     /** @param department Assigned business department. */
     public void setDepartment(EmployeeDepartment department) { this.department = department; }
+
+    /** @param orgGroup Assigned organizational group. */
+    public void setOrgGroup(OrganizationalGroup orgGroup) { this.orgGroup = orgGroup; }
+
+    /** @param managerId Personal manager's UUID. */
+    public void setManagerId(UUID managerId) { this.managerId = managerId; }
+
+    /** @param managerName Personal manager's full name. */
+    public void setManagerName(String managerName) { this.managerName = managerName; }
 
     /** @param active Activation flag. */
     public void setActive(boolean active) { this.active = active; }

@@ -140,7 +140,7 @@ public class AuthSecurityConfiguration {
         return http.csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/register", "/api/auth/login", "/actuator/health/**").permitAll()
+                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/internal/**", "/actuator/health/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resource -> resource.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter)))
                 .build();
@@ -166,10 +166,16 @@ public class AuthSecurityConfiguration {
                 for (Object raw : roles) {
                     if (!(raw instanceof String role)) continue;
                     String normalized = role.trim().toUpperCase(Locale.ROOT);
-                    if (normalized.equals("ADMIN") || normalized.equals("ADMINISTRATOR") || normalized.equals("MANAGER")) {
+                    if (normalized.equals("ADMIN") || normalized.equals("ADMINISTRATOR")) {
                         normalized = PortalRole.MANAGER_ADMIN.name();
                     }
-                    try { authorities.add(new SimpleGrantedAuthority("ROLE_" + PortalRole.valueOf(normalized).name())); }
+                    try {
+                        PortalRole parsed = PortalRole.valueOf(normalized);
+                        authorities.add(new SimpleGrantedAuthority("ROLE_" + parsed.name()));
+                        if (parsed == PortalRole.MANAGER_ADMIN) {
+                            authorities.add(new SimpleGrantedAuthority("ROLE_MANAGER"));
+                        }
+                    }
                     catch (IllegalArgumentException ignored) { }
                 }
             }
