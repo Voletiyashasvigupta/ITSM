@@ -21,6 +21,7 @@ security:
     ttl-minutes: ${JWT_TTL_MINUTES:60}
 bootstrap:
   admin:
+    username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
     email: ${BOOTSTRAP_ADMIN_EMAIL:}
     password: ${BOOTSTRAP_ADMIN_PASSWORD:}
     full-name: ${BOOTSTRAP_ADMIN_NAME:Northstar Administrator}

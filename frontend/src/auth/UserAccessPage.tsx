@@ -23,6 +23,8 @@ import { useAuth, type EmployeeDepartment, type PortalRole } from './AuthContext
  */
 type UserSummary = {
   id: string
+  employeeId?: string
+  username: string
   fullName: string
   email: string
   role: PortalRole | null
@@ -48,6 +50,8 @@ const departments: Array<{ value: EmployeeDepartment; label: string }> = [
 
 const createUserDefaults = () => ({
   fullName: '',
+  username: '',
+  employeeId: '',
   email: '',
   temporaryPassword: '',
   role: 'EMPLOYEE' as PortalRole,
@@ -142,6 +146,8 @@ export default function UserAccessPage() {
         body: JSON.stringify({
           ...newUser,
           fullName: newUser.fullName.trim(),
+          username: newUser.username.trim().toLowerCase() || undefined,
+          employeeId: newUser.employeeId.trim().toUpperCase() || undefined,
           email: newUser.email.trim(),
           department: newUser.department || null,
         }),
@@ -238,7 +244,19 @@ export default function UserAccessPage() {
                       borderTop: '1px solid #eef0f5',
                     }}
                   >
-                    <Typography sx={{ fontSize: 13, fontWeight: 650 }}>{account.fullName}</Typography>
+                    <Box>
+                      <Typography sx={{ fontSize: 13, fontWeight: 650 }}>{account.fullName}</Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.25 }}>
+                        <Typography sx={{ fontSize: 11, color: 'text.secondary', fontFamily: 'monospace' }}>
+                          @{account.username || account.email.split('@')[0]}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={account.employeeId || 'EMP-AUTO'}
+                          sx={{ height: 18, fontSize: 10, fontWeight: 700, bgcolor: '#f1f5f9', color: '#0369a1', border: '1px solid #bae6fd' }}
+                        />
+                      </Box>
+                    </Box>
                     <Typography sx={{ fontSize: 12 }} color="text.secondary">
                       {account.email}
                     </Typography>
@@ -326,6 +344,22 @@ export default function UserAccessPage() {
             label="Full name"
             value={newUser.fullName}
             onChange={(event) => setNewUser((current) => ({ ...current, fullName: event.target.value }))}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth
+            label="Corporate Username"
+            placeholder="e.g. alex.rivera (optional, defaults to email prefix)"
+            value={newUser.username}
+            onChange={(event) => setNewUser((current) => ({ ...current, username: event.target.value }))}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            fullWidth
+            label="Employee ID (Optional)"
+            placeholder="e.g. EMP-10001 (auto-assigned if omitted)"
+            value={newUser.employeeId}
+            onChange={(event) => setNewUser((current) => ({ ...current, employeeId: event.target.value }))}
             sx={{ mb: 2 }}
           />
           <TextField

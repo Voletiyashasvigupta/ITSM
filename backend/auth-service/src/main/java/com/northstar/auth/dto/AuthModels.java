@@ -22,14 +22,16 @@ import java.util.UUID;
 public final class AuthModels {
     private AuthModels() {}
 
-    /** Input payload for self-service user registration. */
+    /** Input payload for self-service user registration. Registration requires work email and can include chosen username and employee ID. */
     public record RegisterInput(
             @NotBlank @Size(max = 120) String fullName,
+            @Size(max = 60) String username,
+            @Size(max = 32) String employeeId,
             @NotBlank @Email @Size(max = 254) String email,
             @NotBlank @Size(min = 12, max = 72) String password) {}
 
-    /** Input payload for user login authentication. */
-    public record LoginInput(@NotBlank @Email @Size(max = 254) String email, @NotBlank String password) {}
+    /** Input payload for enterprise login authentication using corporate username or employee ID. */
+    public record LoginInput(@NotBlank @Size(max = 120) String username, @NotBlank String password) {}
 
     /** Input payload for changing account password. */
     public record PasswordChange(@NotBlank String currentPassword, @NotBlank @Size(min = 12, max = 72) String newPassword) {}
@@ -43,16 +45,18 @@ public final class AuthModels {
     /** Input payload for administrator-initiated user creation with predefined credentials. */
     public record AdminUserCreateInput(
             @NotBlank @Size(max = 120) String fullName,
+            @Size(max = 60) String username,
+            @Size(max = 32) String employeeId,
             @NotBlank @Email @Size(max = 254) String email,
             @NotBlank @Size(min = 12, max = 72) String temporaryPassword,
             @NotNull PortalRole role,
             EmployeeDepartment department) {}
 
     /** Summary DTO of a portal user displayed in administrative listings. */
-    public record UserSummary(UUID id, String fullName, String email, PortalRole role, EmployeeDepartment department, boolean active, Instant createdAt) {}
+    public record UserSummary(UUID id, String employeeId, String username, String fullName, String email, PortalRole role, EmployeeDepartment department, boolean active, Instant createdAt) {}
 
     /** Authenticated user identity and permission descriptor embedded in tokens and profile checks. */
-    public record AuthenticatedUser(UUID id, String fullName, String email, PortalRole role, EmployeeDepartment department, List<String> roles) {}
+    public record AuthenticatedUser(UUID id, String employeeId, String username, String fullName, String email, PortalRole role, EmployeeDepartment department, List<String> roles) {}
 
     /** Lightweight user descriptor used for populating approver selection dropdowns. */
     public record ApproverOption(UUID id, String fullName) {}
@@ -61,6 +65,6 @@ public final class AuthModels {
     public record TokenResponse(String accessToken, String tokenType, long expiresInSeconds, AuthenticatedUser user) {}
 
     /** Response payload acknowledging registration submission. */
-    public record RegistrationResponse(UUID id, String fullName, String email, String status, Instant createdAt) {}
+    public record RegistrationResponse(UUID id, String employeeId, String username, String fullName, String email, String status, Instant createdAt) {}
 }
 

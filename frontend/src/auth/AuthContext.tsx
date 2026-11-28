@@ -28,6 +28,8 @@ export type EmployeeDepartment =
  */
 export type PortalUser = {
   id: string
+  employeeId?: string
+  username: string
   fullName: string
   email: string
   role: PortalRole
@@ -56,10 +58,10 @@ type AuthValue = {
   isImpersonating: boolean
   /** Indicates whether initial session verification (/api/auth/me) is in progress. */
   loading: boolean
-  /** Authenticates against /api/auth/login, stores the JWT, and initializes user state. */
-  login: (email: string, password: string) => Promise<void>
-  /** Registers a new account awaiting administrative role assignment. */
-  register: (fullName: string, email: string, password: string) => Promise<RegistrationResponse>
+  /** Authenticates against /api/auth/login with corporate username, stores the JWT, and initializes user state. */
+  login: (username: string, password: string) => Promise<void>
+  /** Registers a new account with work email and optional chosen corporate username and employee ID, awaiting administrative role assignment. */
+  register: (fullName: string, email: string, password: string, username?: string, employeeId?: string) => Promise<RegistrationResponse>
   /** Logs out by purging JWT and session data from sessionStorage. */
   logout: () => void
   /** Initiates administrative user testing/impersonation. */
@@ -150,11 +152,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isImpersonating: Boolean(originalSession),
       loading,
       apiFetch,
-      login: async (email, password) => {
+      login: async (username, password) => {
         const response = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ username: username.trim(), password }),
         })
         if (!response.ok) throw new Error(await errorMessage(response))
         const result = (await response.json()) as LoginResponse
@@ -163,11 +165,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sessionStorage.setItem(TOKEN_KEY, result.accessToken)
         setUser(result.user)
       },
-      register: async (fullName, email, password) => {
+      register: async (fullName, email, password, username, employeeId) => {
         const response = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fullName, email, password }),
+          body: JSON.stringify({
+            fullName: fullName.trim(),
+            email: email.trim(),
+            password,
+            username: username ? username.trim().toLowerCase() : undefined,
+            employeeId: employeeId ? employeeId.trim().toUpperCase() : undefined,
+          }),
         })
         if (!response.ok) throw new Error(await errorMessage(response))
         return (await response.json()) as RegistrationResponse

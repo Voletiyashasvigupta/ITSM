@@ -80,41 +80,54 @@ public class AuthService {
     /**
      * Registers a new employee account in an inactive state pending role assignment.
      *
-     * <p><b>Purpose:</b> Creates a new portal user record with a BCrypt-hashed password, initial null role, and active=false.
+     * <p><b>Purpose:</b> Creates a new portal user record with username, email, BCrypt-hashed password,
+     * initial null role, and active=false.
      *
      * <p><b>Downstream / Workflow:</b> Saves record to MySQL. The employee cannot sign in until an administrator
      * assigns an active role via {@link #assignAccess(UUID, AccessAssignment, UUID)}.
      *
-     * @param input Registration form containing full name, email, and password.
+     * @param input Registration form containing full name, optional/provided username, email, and password.
      * @return RegistrationResponse with PENDING_ROLE_ASSIGNMENT status.
      */
     @Transactional
     public RegistrationResponse register(RegisterInput input) {
         String email = normalizeEmail(input.email());
+        String username = (input.username() != null && !input.username().isBlank())
+                ? normalizeUsername(input.username())
+                : deriveUsername(email);
+        String employeeId = (input.employeeId() != null && !input.employeeId().isBlank())
+                ? input.employeeId().trim().toUpperCase()
+                : generateEmployeeId();
         validatePasswordBytes(input.password());
         if (users.existsByEmail(email)) throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists");
+        if (users.existsByUsernameIgnoreCase(username)) throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this username already exists");
+        if (users.existsByEmployeeIdIgnoreCase(employeeId)) throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this employee ID already exists");
         try {
-            PortalUser user = users.save(new PortalUser(input.fullName().trim(), email, passwords.encode(input.password()), null, false));
-            return new RegistrationResponse(user.getId(), user.getFullName(), user.getEmail(), "PENDING_ROLE_ASSIGNMENT", user.getCreatedAt());
+            PortalUser user = users.save(new PortalUser(employeeId, username, input.fullName().trim(), email, passwords.encode(input.password()), null, false));
+            return new RegistrationResponse(user.getId(), user.getEmployeeId(), user.getUsername(), user.getFullName(), user.getEmail(), "PENDING_ROLE_ASSIGNMENT", user.getCreatedAt());
         } catch (DataIntegrityViolationException race) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email, username, or employee ID already exists");
         }
     }
 
     /**
-     * Authenticates an employee by email and password, returning a signed JWT access token.
+     * Authenticates an employee by corporate username, employee ID, or corporate email and password.
      *
      * <p><b>Purpose:</b> Verifies user credentials with BCrypt and ensures the account is active and has an assigned role.
      *
      * <p><b>Downstream / Workflow:</b> If valid, invokes {@link #issueToken(PortalUser, UUID)} to produce a signed JWT.
      *
-     * @param input Login credentials.
+     * @param input Login credentials containing username or employee ID and password.
      * @return TokenResponse with Bearer token and user profile.
      */
     public TokenResponse login(LoginInput input) {
-        PortalUser user = users.findByEmail(normalizeEmail(input.email())).orElse(null);
+        String identifier = input.username().trim();
+        PortalUser user = users.findByUsernameIgnoreCase(identifier)
+                .or(() -> users.findByEmployeeIdIgnoreCase(identifier))
+                .or(() -> users.findByEmail(normalizeEmail(identifier)))
+                .orElse(null);
         if (user == null || !passwords.matches(input.password(), user.getPasswordHash())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email or password is incorrect");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Username or password is incorrect");
         }
         if (!user.isActive() || user.getRole() == null) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Your account is waiting for an administrator to assign access");
@@ -164,6 +177,9 @@ public class AuthService {
                 .issuedAt(now)
                 .expiresAt(expires)
                 .subject(user.getId().toString())
+                .claim("employee_id", user.getEmployeeId())
+                .claim("username", user.getUsername())
+                .claim("preferred_username", user.getUsername())
                 .claim("email", user.getEmail())
                 .claim("name", user.getFullName())
                 .claim("roles", List.of(user.getRole().name()));
@@ -250,6 +266,12 @@ public class AuthService {
     public UserSummary createUser(AdminUserCreateInput input) {
         String email = normalizeEmail(input.email());
         String fullName = input.fullName().trim();
+        String username = (input.username() != null && !input.username().isBlank())
+                ? normalizeUsername(input.username())
+                : deriveUsername(email);
+        String employeeId = (input.employeeId() != null && !input.employeeId().isBlank())
+                ? input.employeeId().trim().toUpperCase()
+                : generateEmployeeId();
         validatePasswordBytes(input.temporaryPassword());
         if (input.role() == PortalRole.EMPLOYEE && input.department() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Select a department for employee access");
@@ -257,12 +279,18 @@ public class AuthService {
         if (users.existsByEmail(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists");
         }
+        if (users.existsByUsernameIgnoreCase(username)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this username already exists");
+        }
+        if (users.existsByEmployeeIdIgnoreCase(employeeId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this employee ID already exists");
+        }
         try {
-            PortalUser user = new PortalUser(fullName, email, passwords.encode(input.temporaryPassword()), input.role(), true);
+            PortalUser user = new PortalUser(employeeId, username, fullName, email, passwords.encode(input.temporaryPassword()), input.role(), true);
             user.setDepartment(input.department());
             return summary(users.save(user));
         } catch (DataIntegrityViolationException race) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email already exists");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "An account with this email, username, or employee ID already exists");
         }
     }
 
@@ -368,7 +396,7 @@ public class AuthService {
      * @return UserSummary DTO.
      */
     private static UserSummary summary(PortalUser user) {
-        return new UserSummary(user.getId(), user.getFullName(), user.getEmail(), user.getRole(), user.getDepartment(), user.isActive(), user.getCreatedAt());
+        return new UserSummary(user.getId(), user.getEmployeeId(), user.getUsername(), user.getFullName(), user.getEmail(), user.getRole(), user.getDepartment(), user.isActive(), user.getCreatedAt());
     }
 
     /**
@@ -382,6 +410,34 @@ public class AuthService {
      * @return AuthenticatedUser DTO.
      */
     private static AuthenticatedUser authenticated(PortalUser user) {
-        return new AuthenticatedUser(user.getId(), user.getFullName(), user.getEmail(), user.getRole(), user.getDepartment(), List.of(user.getRole().name()));
+        return new AuthenticatedUser(user.getId(), user.getEmployeeId(), user.getUsername(), user.getFullName(), user.getEmail(), user.getRole(), user.getDepartment(), List.of(user.getRole().name()));
+    }
+
+    /**
+     * Generates a unique corporate employee identifier (e.g. EMP-10001).
+     */
+    private String generateEmployeeId() {
+        for (int i = 0; i < 15; i++) {
+            String candidate = "EMP-" + String.format("%05d", (int)(Math.random() * 90000) + 10000);
+            if (!users.existsByEmployeeIdIgnoreCase(candidate)) return candidate;
+        }
+        return "EMP-" + UUID.randomUUID().toString().substring(0, 5).toUpperCase();
+    }
+
+    /**
+     * Trims and lowercases corporate username strings for consistent matching.
+     */
+    private static String normalizeUsername(String username) {
+        return username.trim().toLowerCase();
+    }
+
+    /**
+     * Derives a corporate username from email prefix or fallback UUID.
+     */
+    private static String deriveUsername(String email) {
+        if (email != null && email.contains("@")) {
+            return email.substring(0, email.indexOf('@')).trim().toLowerCase();
+        }
+        return "user_" + UUID.randomUUID().toString().substring(0, 8);
     }
 }

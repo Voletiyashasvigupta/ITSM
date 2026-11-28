@@ -18,6 +18,61 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface PortalUserRepository extends JpaRepository<PortalUser, UUID> {
 
     /**
+     * Finds a user by their unique corporate employee ID (e.g. EMP-10001, case-insensitive).
+     *
+     * @param employeeId The corporate employee identifier.
+     * @return Optional containing the user if found.
+     */
+    Optional<PortalUser> findByEmployeeIdIgnoreCase(String employeeId);
+
+    /**
+     * Checks if a user record with the specified employee ID already exists (case-insensitive).
+     *
+     * @param employeeId The corporate employee identifier to check.
+     * @return {@code true} if an account exists with this employee ID.
+     */
+    boolean existsByEmployeeIdIgnoreCase(String employeeId);
+
+    /**
+     * Finds a user by corporate username, employee ID, or email address (case-insensitive).
+     *
+     * @param username Corporate username.
+     * @param employeeId Corporate employee identifier.
+     * @param email Corporate email address.
+     * @return Optional containing the user if found.
+     */
+    Optional<PortalUser> findByUsernameIgnoreCaseOrEmployeeIdIgnoreCaseOrEmailIgnoreCase(String username, String employeeId, String email);
+
+    /**
+     * Finds a user by their unique corporate login username (case-insensitive).
+     *
+     * <p><b>Purpose:</b> Primary enterprise lookup for login authentication.
+     *
+     * @param username The corporate username.
+     * @return Optional containing the user if found.
+     */
+    Optional<PortalUser> findByUsernameIgnoreCase(String username);
+
+    /**
+     * Checks if a user record with the specified username already exists (case-insensitive).
+     *
+     * @param username The username to check.
+     * @return {@code true} if an account exists with this username.
+     */
+    boolean existsByUsernameIgnoreCase(String username);
+
+    /**
+     * Finds a user by corporate username or corporate email (case-insensitive).
+     *
+     * <p><b>Purpose:</b> Resilient lookup supporting enterprise username login while allowing email resolution.
+     *
+     * @param username Corporate username.
+     * @param email Corporate email address.
+     * @return Optional containing the user if found.
+     */
+    Optional<PortalUser> findByUsernameIgnoreCaseOrEmailIgnoreCase(String username, String email);
+
+    /**
      * Finds a user by their unique email address.
      *
      * <p><b>Purpose:</b> Core lookup for login authentication and duplicate checks.

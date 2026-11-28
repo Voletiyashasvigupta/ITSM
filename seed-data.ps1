@@ -10,7 +10,7 @@ Write-Host "==========================================================" -Foregro
 # 1. Authenticate as Admin
 Write-Host "`n[1/6] Authenticating as Admin..." -ForegroundColor Yellow
 $loginPayload = @{
-    email = "admin@northstar.local"
+    username = "admin"
     password = "NorthstarLocal2026!"
 } | ConvertTo-Json
 
@@ -18,7 +18,7 @@ try {
     $auth = Invoke-RestMethod -Uri "$baseUrl/api/auth/login" -Method Post -Body $loginPayload -ContentType "application/json"
     $token = $auth.accessToken
     $adminId = $auth.user.id
-    Write-Host "  -> Logged in as: $($auth.user.email) (ID: $adminId)" -ForegroundColor Green
+    Write-Host "  -> Logged in as: $($auth.user.username) ($($auth.user.email)) [ID: $adminId]" -ForegroundColor Green
 } catch {
     Write-Error "Failed to authenticate with admin credentials: $_"
     exit 1
@@ -32,27 +32,29 @@ $headers = @{
 # 2. Seed Users
 Write-Host "`n[2/6] Seeding Users..." -ForegroundColor Yellow
 $users = @(
-    @{ fullName = "Alex Rivera"; email = "alex.rivera@northstar.local"; role = "MANAGER_ADMIN"; department = "SOFTWARE_ENGINEERING" },
-    @{ fullName = "Sarah Jenkins"; email = "sarah.jenkins@northstar.local"; role = "MANAGER_ADMIN"; department = "IT" },
-    @{ fullName = "Elena Rostova"; email = "elena.rostova@northstar.local"; role = "EMPLOYEE"; department = "CUSTOMER_SUPPORT" },
-    @{ fullName = "David Kim"; email = "david.kim@northstar.local"; role = "EMPLOYEE"; department = "FINANCE" },
-    @{ fullName = "Priya Patel"; email = "priya.patel@northstar.local"; role = "EMPLOYEE"; department = "HUMAN_RESOURCES" },
-    @{ fullName = "Marcus Vance"; email = "marcus.vance@northstar.local"; role = "EMPLOYEE"; department = "OPERATIONS" }
+    @{ fullName = "Alex Rivera"; username = "alex.rivera"; employeeId = "EMP-10001"; email = "alex.rivera@northstar.local"; role = "MANAGER_ADMIN"; department = "SOFTWARE_ENGINEERING" },
+    @{ fullName = "Sarah Jenkins"; username = "sarah.jenkins"; employeeId = "EMP-10002"; email = "sarah.jenkins@northstar.local"; role = "MANAGER_ADMIN"; department = "IT" },
+    @{ fullName = "Elena Rostova"; username = "elena.rostova"; employeeId = "EMP-10003"; email = "elena.rostova@northstar.local"; role = "EMPLOYEE"; department = "CUSTOMER_SUPPORT" },
+    @{ fullName = "David Kim"; username = "david.kim"; employeeId = "EMP-10004"; email = "david.kim@northstar.local"; role = "EMPLOYEE"; department = "FINANCE" },
+    @{ fullName = "Priya Patel"; username = "priya.patel"; employeeId = "EMP-10005"; email = "priya.patel@northstar.local"; role = "EMPLOYEE"; department = "HUMAN_RESOURCES" },
+    @{ fullName = "Marcus Vance"; username = "marcus.vance"; employeeId = "EMP-10006"; email = "marcus.vance@northstar.local"; role = "EMPLOYEE"; department = "OPERATIONS" }
 )
 
 foreach ($u in $users) {
     try {
         $body = @{
             fullName = $u.fullName
+            username = $u.username
+            employeeId = $u.employeeId
             email = $u.email
             temporaryPassword = "Password12345!"
             role = $u.role
             department = $u.department
         } | ConvertTo-Json
         $res = Invoke-RestMethod -Uri "$baseUrl/api/auth/admin/users" -Method Post -Headers $headers -Body $body
-        Write-Host "  + Created user: $($u.fullName) ($($u.email)) [$($u.role)]" -ForegroundColor Green
+        Write-Host "  + Created user: $($u.fullName) [$($u.employeeId) / @$($u.username) / $($u.email)]" -ForegroundColor Green
     } catch {
-        Write-Host "  . User already exists or active: $($u.email)" -ForegroundColor Gray
+        Write-Host "  . User already exists or active: $($u.username) ($($u.email))" -ForegroundColor Gray
     }
 }
 

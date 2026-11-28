@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 public class BootstrapAdmin implements ApplicationRunner {
     private final PortalUserRepository users;
     private final PasswordEncoder passwords;
+    private final String username;
     private final String email;
     private final String password;
     private final String name;
@@ -36,16 +37,19 @@ public class BootstrapAdmin implements ApplicationRunner {
      *
      * @param users The PortalUserRepository.
      * @param passwords BCrypt password encoder.
+     * @param username Admin username configured via {@code bootstrap.admin.username}.
      * @param email Admin email configured via {@code bootstrap.admin.email}.
      * @param password Admin password configured via {@code bootstrap.admin.password}.
      * @param name Admin display name configured via {@code bootstrap.admin.full-name}.
      */
     public BootstrapAdmin(PortalUserRepository users, PasswordEncoder passwords,
+            @Value("${bootstrap.admin.username:admin}") String username,
             @Value("${bootstrap.admin.email:}") String email,
             @Value("${bootstrap.admin.password:}") String password,
             @Value("${bootstrap.admin.full-name:Northstar Administrator}") String name) {
         this.users = users;
         this.passwords = passwords;
+        this.username = (username != null && !username.isBlank()) ? username.trim().toLowerCase() : "admin";
         this.email = email.trim().toLowerCase();
         this.password = password;
         this.name = name;
@@ -55,7 +59,7 @@ public class BootstrapAdmin implements ApplicationRunner {
      * Seeds or updates the bootstrap administrator account in the database.
      *
      * <p><b>Purpose:</b> Validates password complexity (min 12 chars), hashes the password with BCrypt,
-     * and sets role to {@link PortalRole#MANAGER_ADMIN} and active status to true.
+     * sets corporate username, and sets role to {@link PortalRole#MANAGER_ADMIN} and active status to true.
      *
      * <p><b>Downstream / Workflow:</b> Saves the record in {@link PortalUserRepository}, enabling immediate admin login.
      *
@@ -67,13 +71,19 @@ public class BootstrapAdmin implements ApplicationRunner {
         if (email.isBlank() || password.length() < 12) {
             throw new IllegalStateException("Set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD (at least 12 characters)");
         }
-        users.findByEmail(email).ifPresentOrElse(user -> {
+        users.findByEmail(email).or(() -> users.findByUsernameIgnoreCase(username)).ifPresentOrElse(user -> {
+            if (user.getUsername() == null || user.getUsername().isBlank()) {
+                user.setUsername(username);
+            }
+            if (user.getEmployeeId() == null || user.getEmployeeId().isBlank()) {
+                user.setEmployeeId("EMP-00001");
+            }
             user.setPasswordHash(passwords.encode(password));
             user.setActive(true);
             user.setRole(PortalRole.MANAGER_ADMIN);
             users.save(user);
         }, () -> {
-            users.save(new PortalUser(name, email, passwords.encode(password), PortalRole.MANAGER_ADMIN, true));
+            users.save(new PortalUser("EMP-00001", username, name, email, passwords.encode(password), PortalRole.MANAGER_ADMIN, true));
         });
     }
 }

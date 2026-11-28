@@ -13,6 +13,8 @@ export default function AuthScreen() {
   const { login, register } = useAuth()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [fullName, setFullName] = useState('')
+  const [username, setUsername] = useState('')
+  const [employeeId, setEmployeeId] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -29,11 +31,11 @@ export default function AuthScreen() {
     setBusy(true)
     try {
       if (mode === 'login') {
-        // Authenticate with Auth Service
-        await login(email, password)
+        // Authenticate with Auth Service using corporate username or employee ID
+        await login(username, password)
       } else {
-        // Create pending account awaiting administrative role assignment
-        await register(fullName, email, password)
+        // Create pending account with work email, corporate username, and employee ID
+        await register(fullName, email, password, username, employeeId)
         setNotice('Account created. A Manager or Administrator must assign your access before you can sign in.')
         setMode('login')
         setPassword('')
@@ -81,7 +83,7 @@ export default function AuthScreen() {
           {mode === 'login' ? 'Welcome back' : 'Create your account'}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-          {mode === 'login' ? 'Sign in with your portal account.' : 'Register with your work email. Access is assigned by an administrator.'}
+          {mode === 'login' ? 'Sign in with your enterprise username.' : 'Register with your work email. Access is assigned by an administrator.'}
         </Typography>
 
         {/* Tab switch between Sign In and Register */}
@@ -93,28 +95,59 @@ export default function AuthScreen() {
         {notice && <Alert severity="success" sx={{ mb: 2 }}>{notice}</Alert>}
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        {mode === 'register' && (
+        {mode === 'login' ? (
           <TextField
             required
             fullWidth
-            label="Full name"
-            autoComplete="name"
-            value={fullName}
-            onChange={(event) => setFullName(event.target.value)}
+            label="Corporate Username or Employee ID"
+            autoComplete="username"
+            placeholder="e.g. admin, alex.rivera, or EMP-00001"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
             sx={{ mb: 2 }}
           />
+        ) : (
+          <>
+            <TextField
+              required
+              fullWidth
+              label="Full name"
+              autoComplete="name"
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              required
+              fullWidth
+              label="Work email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              fullWidth
+              label="Corporate Username (Optional)"
+              autoComplete="username"
+              placeholder="e.g. alex.rivera"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              helperText="Defaults to your email prefix if left blank."
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              fullWidth
+              label="Employee ID (Optional)"
+              placeholder="e.g. EMP-10001"
+              value={employeeId}
+              onChange={(event) => setEmployeeId(event.target.value)}
+              helperText="Corporate badge identifier. Auto-assigned if omitted."
+              sx={{ mb: 2 }}
+            />
+          </>
         )}
-
-        <TextField
-          required
-          fullWidth
-          label="Work email"
-          type="email"
-          autoComplete="username"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          sx={{ mb: 2 }}
-        />
 
         <TextField
           required
@@ -144,11 +177,11 @@ export default function AuthScreen() {
               variant="outlined"
               fullWidth
               onClick={() => {
-                setEmail('admin@northstar.local')
+                setUsername('admin')
                 setPassword('NorthstarLocal2026!')
               }}
             >
-              Fill Admin Credentials (admin@northstar.local)
+              Fill Admin Credentials (admin)
             </Button>
           </Box>
         )}
